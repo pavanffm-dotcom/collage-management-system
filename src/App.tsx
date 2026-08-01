@@ -5,6 +5,12 @@ import { PublicStudentView } from './components/PublicStudentView';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { QRModal } from './components/QRModal';
+import { HomePortal } from './components/HomePortal';
+import { BookOpen, Search, PlusCircle, BarChart2, Settings } from 'lucide-react';
+
+// Departments View imports
+import { WorkInProgressView } from './components/WorkInProgressView';
+
 import { Book, College, LibraryStats } from './types';
 
 function AppContent({
@@ -31,113 +37,74 @@ function AppContent({
   recentLogs,
   fetchAdminStats,
   departments,
-  handleUpdateCollege
+  handleUpdateCollege,
+  
+  // Custom states passed to AppContent
+  selectedDept,
+  setSelectedDept,
+  handleHomeSignInSuccess
 }: any) {
   const { currentPreset } = useTheme();
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
 
+  // If there's no logged-in student or faculty profile, display the Home Portal signup sheet
+  if (!authUser) {
+    return (
+      <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-500 relative overflow-hidden`}>
+        
+        {/* Ambient Theme Background Glow */}
+        <div className={`absolute top-0 inset-x-0 h-[480px] bg-gradient-to-b ${currentPreset.gradientBg} opacity-80 pointer-events-none blur-3xl transition-all duration-700`} />
+        
+        {/* Fixed Header on Portal for Theme Switches */}
+        <Header
+          currentCollege={currentCollege}
+          authUser={null}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onLogout={handleLogout}
+          onOpenQRModal={() => setIsQRModalOpen(true)}
+          activeView={activeView}
+          setActiveView={setActiveView}
+          adminTab={adminTab}
+          setAdminTab={setAdminTab}
+          onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        />
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccessLogin={(user, college) => {
+            handleSuccessLogin(user, college);
+            setSelectedDept('library'); // direct librarian logins access the library first
+          }}
+          colleges={colleges}
+        />
+
+        {/* Dynamic Interactive Welcome Portal */}
+        <div className="flex-grow flex items-center justify-center py-8">
+          <HomePortal 
+            onSignInSuccess={handleHomeSignInSuccess} 
+            isThemeModalOpen={isThemeModalOpen}
+            setIsThemeModalOpen={setIsThemeModalOpen}
+          />
+        </div>
+
+        {/* Generic Portal Footer */}
+        <footer className="bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md border-t border-slate-200/20 dark:border-zinc-800/20 py-4 text-center text-xs text-slate-400 dark:text-slate-500 z-10">
+          <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-3">
+            <span>© 2026 Smart CMS Portal. All rights reserved.</span>
+            <span>v2.4.0</span>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // Once signed in, render the appropriate Department View
   return (
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-500 relative overflow-hidden`}>
       
       {/* Ambient Theme Background Glow */}
       <div className={`absolute top-0 inset-x-0 h-[480px] bg-gradient-to-b ${currentPreset.gradientBg} opacity-80 pointer-events-none blur-3xl transition-all duration-700`} />
-
-      {/* Crystal Glass Ambient Spheres & 3D Glassy Bubbles (Mockup Style) */}
-      {currentPreset.id === 'glass' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          {/* Base Sky Blue/Teal Glows */}
-          <div className="absolute -top-12 -left-12 w-48 h-48 sm:w-72 sm:h-72 rounded-full bg-gradient-to-tr from-cyan-400 to-sky-300 dark:from-cyan-600 dark:to-sky-500 opacity-40 dark:opacity-30 blur-2xl animate-pulse" style={{ animationDuration: '8s' }} />
-          
-          {/* High-Contrast Blurred Black Fluid Blobs from Mockup Image */}
-          <div className="absolute top-[20%] -right-12 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-slate-950/40 dark:bg-black/90 opacity-80 dark:opacity-60 blur-[80px]" />
-          <div className="absolute bottom-[15%] -left-16 w-80 h-80 sm:w-[450px] sm:h-[450px] rounded-full bg-slate-950/30 dark:bg-black/80 opacity-70 dark:opacity-50 blur-[90px]" />
-
-          {/* Large Floating Glassy Sphere behind content */}
-          <div className="absolute top-[15%] left-[25%] w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-sky-400/20 via-cyan-300/10 to-transparent blur-3xl" />
-
-          {/* 3D Glassy Water Droplets / Bubbles from Reference Image */}
-          {/* Droplet 1: Middle Left Floating */}
-          <div className="absolute top-[35%] left-[3%] sm:left-[5%] w-24 h-24 rounded-full border border-white/60 dark:border-white/20 bg-white/5 backdrop-blur-[2px] shadow-[inset_-8px_-8px_16px_rgba(255,255,255,0.1),_inset_8px_8px_16px_rgba(0,0,0,0.05),_inset_0_4px_8px_rgba(255,255,255,0.6),_0_12px_24px_-8px_rgba(0,0,0,0.2)] animate-bounce" style={{ animationDuration: '6s' }}>
-            {/* Highlight glare */}
-            <div className="absolute top-3 left-4 w-6 h-3 rounded-full bg-white/75 rotate-[-25deg] filter blur-[0.3px]" />
-            <div className="absolute bottom-3 right-5 w-2.5 h-2.5 rounded-full bg-white/40" />
-          </div>
-
-          {/* Droplet 2: Lower Right Floating */}
-          <div className="absolute bottom-[25%] right-[2%] sm:right-[6%] w-28 h-28 rounded-full border border-white/60 dark:border-white/20 bg-white/5 backdrop-blur-[2px] shadow-[inset_-10px_-10px_20px_rgba(255,255,255,0.15),_inset_10px_10px_20px_rgba(0,0,0,0.05),_inset_0_5px_10px_rgba(255,255,255,0.7),_0_16px_32px_-10px_rgba(0,0,0,0.25)] animate-bounce" style={{ animationDuration: '8s' }}>
-            {/* Highlight glare */}
-            <div className="absolute top-4 left-5 w-7 h-3.5 rounded-full bg-white/80 rotate-[-28deg] filter blur-[0.2px]" />
-            <div className="absolute bottom-4 right-6 w-3 h-3 rounded-full bg-white/45" />
-          </div>
-
-          {/* Droplet 3: Small Floating Top Right */}
-          <div className="absolute top-[12%] right-[15%] w-14 h-14 rounded-full border border-white/50 dark:border-white/20 bg-white/5 backdrop-blur-[1px] shadow-[inset_-4px_-4px_8px_rgba(255,255,255,0.1),_inset_4px_4px_8px_rgba(0,0,0,0.05),_inset_0_2px_4px_rgba(255,255,255,0.5),_0_8px_16px_rgba(0,0,0,0.15)] animate-pulse" style={{ animationDuration: '4s' }}>
-            {/* Highlight glare */}
-            <div className="absolute top-2 left-2.5 w-3.5 h-2 rounded-full bg-white/70 rotate-[-20deg]" />
-            <div className="absolute bottom-2 right-3.5 w-1.5 h-1.5 rounded-full bg-white/30" />
-          </div>
-
-          {/* Droplet 4: Medium Left Bottom */}
-          <div className="absolute bottom-[10%] left-[12%] w-18 h-18 rounded-full border border-white/50 dark:border-white/20 bg-white/5 backdrop-blur-[2px] shadow-[inset_-6px_-6px_12px_rgba(255,255,255,0.12),_inset_6px_6px_12px_rgba(0,0,0,0.05),_inset_0_3px_6px_rgba(255,255,255,0.6),_0_10px_20px_rgba(0,0,0,0.18)] animate-pulse" style={{ animationDuration: '10s' }}>
-            {/* Highlight glare */}
-            <div className="absolute top-2 left-3 w-4.5 h-2 rounded-full bg-white/75 rotate-[-22deg]" />
-            <div className="absolute bottom-2.5 right-4 w-2 h-2 rounded-full bg-white/35" />
-          </div>
-        </div>
-      )}
-
-      {/* Dreamy Pastel Claymorphism & Ultra-Frosted 3D Glass Mockup Elements */}
-      {currentPreset.id === 'clayglass' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          {/* Pastel Radial Background Glows */}
-          <div className="absolute top-[5%] left-[10%] w-[500px] h-[500px] rounded-full bg-indigo-300/20 dark:bg-indigo-900/10 blur-[130px] animate-pulse" style={{ animationDuration: '14s' }} />
-          <div className="absolute top-[35%] right-[-5%] w-[600px] h-[600px] rounded-full bg-purple-300/20 dark:bg-purple-900/10 blur-[150px]" />
-          <div className="absolute bottom-[5%] left-[15%] w-[450px] h-[450px] rounded-full bg-pink-300/20 dark:bg-pink-950/10 blur-[110px] animate-pulse" style={{ animationDuration: '10s' }} />
-
-          {/* High-Contrast Soft Dark Liquid Blobs (from background mockup) */}
-          <div className="absolute top-[18%] right-[12%] w-64 h-64 sm:w-80 sm:h-80 rounded-full bg-slate-900/10 dark:bg-black/40 blur-[70px]" />
-          <div className="absolute bottom-[22%] left-[8%] w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-slate-900/10 dark:bg-black/30 blur-[80px]" />
-
-          {/* 1. Pink Textured 3D Donut (Torus) - Upper Left Area */}
-          <div className="absolute top-[14%] left-[14%] sm:left-[18%] w-24 h-24 sm:w-32 sm:h-32 rounded-full border-[18px] sm:border-[24px] border-transparent bg-clip-border bg-gradient-to-tr from-pink-500 via-rose-400 to-pink-300 shadow-[0_20px_40px_rgba(244,63,94,0.35),_inset_0_-8px_16px_rgba(0,0,0,0.12),_inset_0_8px_16px_rgba(255,255,255,0.7),_inset_0_0_0_99px_rgba(253,244,245,0.01)] flex items-center justify-center animate-spin" style={{ animationDuration: '20s' }}>
-            {/* Inner negative space shadow */}
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full shadow-[inset_0_4px_8px_rgba(0,0,0,0.15),_0_4px_8px_rgba(255,255,255,0.3)] bg-[#dfd3f6] dark:bg-[#110c1f] transition-all" />
-          </div>
-
-          {/* 2. Yellow 3D Clay Plus Sign (Cross) - Upper Right Area */}
-          <div className="absolute top-[22%] right-[10%] sm:right-[15%] w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rotate-[15deg] animate-bounce" style={{ animationDuration: '8s' }}>
-            {/* Horizontal bar */}
-            <div className="absolute w-12 h-4 sm:w-16 sm:h-5 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 shadow-[0_12px_24px_rgba(245,158,11,0.3),_inset_0_-2px_4px_rgba(0,0,0,0.1),_inset_0_3px_6px_rgba(255,255,255,0.7)]" />
-            {/* Vertical bar */}
-            <div className="absolute h-12 w-4 sm:h-16 sm:w-5 rounded-full bg-gradient-to-b from-amber-400 via-yellow-300 to-amber-400 shadow-[0_12px_24px_rgba(245,158,11,0.3),_inset_0_-2px_4px_rgba(0,0,0,0.1),_inset_0_3px_6px_rgba(255,255,255,0.7)]" />
-          </div>
-
-          {/* 3. Lime Green 3D Clay Capsule - Bottom Left Area */}
-          <div className="absolute bottom-[16%] left-[6%] sm:left-[10%] w-8 h-20 sm:w-10 sm:h-28 rounded-full bg-gradient-to-b from-lime-400 via-emerald-400 to-teal-300 shadow-[0_16px_32px_rgba(132,204,22,0.35),_inset_0_-4px_8px_rgba(0,0,0,0.1),_inset_0_5px_10px_rgba(255,255,255,0.7)] rotate-[35deg] animate-pulse" style={{ animationDuration: '6s' }} />
-
-          {/* 4. Small Pink 3D Floating Torus / Rings - Bottom Right Area */}
-          <div className="absolute bottom-[28%] right-[14%] sm:right-[18%] w-14 h-14 sm:w-20 sm:h-20 rounded-full border-[10px] sm:border-[14px] border-transparent bg-clip-border bg-gradient-to-tr from-pink-400 to-rose-300 shadow-[0_12px_24px_rgba(244,63,94,0.25),_inset_0_-4px_8px_rgba(0,0,0,0.1),_inset_0_4px_8px_rgba(255,255,255,0.7)] flex items-center justify-center animate-spin" style={{ animationDuration: '15s' }}>
-            <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] bg-[#fad2e1] dark:bg-[#170611] transition-all" />
-          </div>
-
-          {/* 5. Central Floating Claymorphic Pin/Star Badge */}
-          <div className="absolute top-[48%] left-[2%] sm:left-[4%] w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/70 dark:bg-white/10 backdrop-blur-md border border-white/80 dark:border-white/20 shadow-[0_12px_28px_rgba(0,0,0,0.08),_inset_0_2px_4px_rgba(255,255,255,0.6)] flex items-center justify-center animate-bounce" style={{ animationDuration: '11s' }}>
-            {/* Pastel violet core */}
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-violet-500 to-purple-400 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <span className="text-white text-xs font-black">+</span>
-            </div>
-          </div>
-
-          {/* 6. Floating Glass Orb with Glossy Reflection - Middle Right */}
-          <div className="absolute top-[44%] right-[2%] sm:right-[5%] w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-white/60 dark:border-white/20 bg-white/5 backdrop-blur-[2px] shadow-[inset_-8px_-8px_16px_rgba(255,255,255,0.15),_inset_8px_8px_16px_rgba(0,0,0,0.05),_inset_0_5px_10px_rgba(255,255,255,0.7),_0_16px_32px_-10px_rgba(109,40,217,0.15)] animate-bounce" style={{ animationDuration: '9s' }}>
-            {/* Reflection Glare */}
-            <div className="absolute top-3 left-4 w-5 h-2.5 rounded-full bg-white/85 rotate-[-25deg] filter blur-[0.2px]" />
-            <div className="absolute bottom-3 right-5 w-2 h-2 rounded-full bg-white/45" />
-          </div>
-
-          {/* 7. Soft Pastel Pink Sphere / Cone style shape - Lower Center */}
-          <div className="absolute bottom-[8%] right-[32%] w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-tr from-pink-400 via-rose-300 to-white shadow-[0_12px_24px_rgba(244,63,94,0.2),_inset_-4px_-4px_8px_rgba(0,0,0,0.1),_inset_4px_4px_8px_rgba(255,255,255,0.8)] animate-pulse" style={{ animationDuration: '5s' }} />
-        </div>
-      )}
 
       {/* Navigation Header */}
       <Header
@@ -150,14 +117,9 @@ function AppContent({
         setActiveView={setActiveView}
         adminTab={adminTab}
         setAdminTab={setAdminTab}
-      />
-
-      {/* Librarian Login & College Registration Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccessLogin={handleSuccessLogin}
-        colleges={colleges}
+        selectedDept={selectedDept}
+        onSelectDept={setSelectedDept}
+        onOpenThemeModal={() => setIsThemeModalOpen(true)}
       />
 
       {/* Entrance QR Generator & Simulator Modal */}
@@ -166,49 +128,212 @@ function AppContent({
         onClose={() => setIsQRModalOpen(false)}
         currentCollege={currentCollege}
         onSimulateScan={() => {
+          setSelectedDept('library');
           setActiveView('public');
         }}
       />
 
-      {/* Main Application Body */}
-      <div className="flex-1 pb-16 md:pb-6 z-10">
-        {activeView === 'public' ? (
-          <PublicStudentView
-            currentCollege={currentCollege}
-            colleges={colleges}
-            onSelectCollege={(col) => setCurrentCollege(col)}
-            onOpenLibrarianLogin={() => setIsAuthModalOpen(true)}
-          />
-        ) : (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <AdminPanel
-              books={books}
-              onAddBook={handleAddBook}
-              onBulkAddBooks={handleBulkAddBooks}
-              onUpdateBook={handleUpdateBook}
-              onDeleteBook={handleDeleteBook}
-              stats={stats}
-              recentLogs={recentLogs}
-              onRefreshStats={() => currentCollege && fetchAdminStats(currentCollege.id)}
-              departments={departments}
-              currentCollege={currentCollege}
-              onUpdateCollege={handleUpdateCollege}
-              activeTab={adminTab}
-              setActiveTab={setAdminTab}
-            />
+      {/* Main Application Body Container */}
+      <main className="flex-1 pb-16 md:pb-8 z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+        {selectedDept === 'library' ? (
+          <div className="space-y-6">
+            
+            {/* Library On-Page Operations Switcher Hub */}
+            <div className="p-6 bg-white/65 dark:bg-zinc-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-zinc-800/40 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                  <BookOpen className={`w-6 h-6 ${currentPreset.accentText}`} />
+                  <span>Library Operations Hub</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  {currentCollege?.name || 'Central Campus Library'} • Dynamic database, live search & logs
+                </p>
+              </div>
+
+              {/* Status Badge with Active Role */}
+              <div className="flex items-center gap-2 self-start md:self-auto bg-slate-500/5 px-3 py-1.5 rounded-xl border border-slate-200/10">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  Role: <span className={`${currentPreset.accentText} uppercase tracking-wider`}>{authUser?.role || 'Guest Student'}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* The 4 Library Hub Navigation Cards (Buttons) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Button 1: Student Find */}
+              <button
+                onClick={() => {
+                  setActiveView('public');
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
+                  activeView === 'public'
+                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
+                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className={`p-2.5 rounded-xl bg-indigo-500 text-white shrink-0`}>
+                    <Search className="w-4.5 h-4.5" />
+                  </div>
+                  {activeView === 'public' && (
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                  )}
+                </div>
+                <div className="mt-4">
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
+                    Student Find
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
+                    Catalog & AI Search
+                  </span>
+                </div>
+              </button>
+
+              {/* Button 2: Add Books */}
+              <button
+                onClick={() => {
+                  setActiveView('admin');
+                  setAdminTab('add');
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
+                  activeView === 'admin' && adminTab === 'add'
+                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
+                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className={`p-2.5 rounded-xl bg-emerald-500 text-white shrink-0`}>
+                    <PlusCircle className="w-4.5 h-4.5" />
+                  </div>
+                  {activeView === 'admin' && adminTab === 'add' && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  )}
+                </div>
+                <div className="mt-4">
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
+                    Add Books
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
+                    Insert & Bulk Import
+                  </span>
+                </div>
+              </button>
+
+              {/* Button 3: Books Analysis */}
+              <button
+                onClick={() => {
+                  setActiveView('admin');
+                  setAdminTab('analytics');
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
+                  activeView === 'admin' && adminTab === 'analytics'
+                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
+                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className={`p-2.5 rounded-xl bg-amber-500 text-white shrink-0`}>
+                    <BarChart2 className="w-4.5 h-4.5" />
+                  </div>
+                  {activeView === 'admin' && adminTab === 'analytics' && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  )}
+                </div>
+                <div className="mt-4">
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
+                    Books Analysis
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
+                    Query Trends & Inventory
+                  </span>
+                </div>
+              </button>
+
+              {/* Button 4: Settings & Config */}
+              <button
+                onClick={() => {
+                  setActiveView('admin');
+                  setAdminTab('settings');
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
+                  activeView === 'admin' && adminTab === 'settings'
+                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
+                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className={`p-2.5 rounded-xl bg-purple-500 text-white shrink-0`}>
+                    <Settings className="w-4.5 h-4.5" />
+                  </div>
+                  {activeView === 'admin' && adminTab === 'settings' && (
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                  )}
+                </div>
+                <div className="mt-4">
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
+                    Settings & Config
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
+                    Campus Profile Setup
+                  </span>
+                </div>
+              </button>
+
+            </div>
+
+            {/* Render Active Subsection */}
+            <div className="pt-2">
+              {activeView === 'public' ? (
+                <PublicStudentView
+                  currentCollege={currentCollege}
+                  colleges={colleges}
+                  onSelectCollege={(col) => setCurrentCollege(col)}
+                  onOpenLibrarianLogin={() => setIsAuthModalOpen(true)}
+                  onOpenQRModal={() => setIsQRModalOpen(true)}
+                />
+              ) : (
+                <AdminPanel
+                  books={books}
+                  onAddBook={handleAddBook}
+                  onBulkAddBooks={handleBulkAddBooks}
+                  onUpdateBook={handleUpdateBook}
+                  onDeleteBook={handleDeleteBook}
+                  stats={stats}
+                  recentLogs={recentLogs}
+                  onRefreshStats={() => currentCollege && fetchAdminStats(currentCollege.id)}
+                  departments={departments}
+                  currentCollege={currentCollege}
+                  onUpdateCollege={handleUpdateCollege}
+                  activeTab={adminTab}
+                  setActiveTab={setAdminTab}
+                  onLogout={handleLogout}
+                />
+              )}
+            </div>
           </div>
+        ) : (
+          /* Render Work in Progress View for other departments */
+          <WorkInProgressView 
+            selectedDept={selectedDept}
+            onBackToLibrary={() => {
+              setSelectedDept('library');
+              setActiveView('public');
+            }}
+          />
         )}
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 z-10">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-            <span>AI Smart Library Finder • {currentCollege?.name || 'Central College Library'}</span>
+            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+            <span>Smart College CMS Portal • {currentCollege?.name || 'Central College Campus'}</span>
           </div>
           <div>
-            100% Public Student Access via Entrance QR Code • Scoped Library Database Search
+            Logged in as {authUser.name} ({authUser.role}) • All modules secured with AES-256
           </div>
         </div>
       </footer>
@@ -222,7 +347,8 @@ export default function App() {
   const [currentCollege, setCurrentCollege] = useState<College | null>(null);
   
   // Auth & View State
-  const [authUser, setAuthUser] = useState<{ name: string; email: string; collegeId: string } | null>(null);
+  const [authUser, setAuthUser] = useState<{ name: string; email: string; collegeId: string; role: string; selectedDept?: string } | null>(null);
+  const [selectedDept, setSelectedDept] = useState<string>('library');
   const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
   const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings'>('add');
   
@@ -393,7 +519,7 @@ export default function App() {
     }
   };
 
-  const handleSuccessLogin = (user: { name: string; email: string; collegeId: string }, college: College) => {
+  const handleSuccessLogin = (user: { name: string; email: string; collegeId: string; role: string }, college: College) => {
     setAuthUser(user);
     setCurrentCollege(college);
     // Refresh colleges list in case a new college was registered
@@ -401,8 +527,27 @@ export default function App() {
     setActiveView('admin');
   };
 
+  const handleHomeSignInSuccess = (user: { name: string; email: string; photoUrl: string; role: string; selectedDept: string }) => {
+    setAuthUser({
+      name: user.name,
+      email: user.email,
+      collegeId: currentCollege?.id || 'gec',
+      role: user.role,
+      photoUrl: user.photoUrl
+    });
+    setSelectedDept(user.selectedDept);
+    
+    // Set view according to role
+    if (user.role === 'Librarian' || user.role === 'Admin' || user.role === 'HOD') {
+      setActiveView('admin');
+    } else {
+      setActiveView('public');
+    }
+  };
+
   const handleLogout = () => {
     setAuthUser(null);
+    setSelectedDept('library');
     setActiveView('public');
   };
 
@@ -433,6 +578,11 @@ export default function App() {
         fetchAdminStats={fetchAdminStats}
         departments={departments}
         handleUpdateCollege={handleUpdateCollege}
+        
+        // Custom props
+        selectedDept={selectedDept}
+        setSelectedDept={setSelectedDept}
+        handleHomeSignInSuccess={handleHomeSignInSuccess}
       />
     </ThemeProvider>
   );

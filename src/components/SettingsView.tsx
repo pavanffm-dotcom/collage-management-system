@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Building2, Save, MapPin, Mail, Sparkles, CheckCircle2, Edit3, Palette, Check, X, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Building2, Save, MapPin, Mail, Sparkles, CheckCircle2, Edit3, Palette, Check, X, ChevronRight, SlidersHorizontal, LogOut } from 'lucide-react';
 import { College } from '../types';
 import { useTheme, THEME_PRESETS, ColorTheme } from '../context/ThemeContext';
 
 interface SettingsViewProps {
   currentCollege: College | null;
   onUpdateCollege: (updatedCollege: Partial<College>) => Promise<void>;
+  onLogout?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   currentCollege,
-  onUpdateCollege
+  onUpdateCollege,
+  onLogout
 }) => {
   const { colorTheme, setColorTheme, currentPreset } = useTheme();
 
@@ -175,6 +177,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
       </div>
+
+      {/* Option 3: Account & Session (Sign Out) */}
+      {onLogout && (
+        <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all duration-500`}>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+              <span>Active Portal Session</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              You are currently logged in. Sign out to change departments, switch roles, or manage other profiles.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="py-2.5 px-5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all border border-rose-100 dark:border-rose-900/30 active:scale-95"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out from Portal</span>
+          </button>
+        </div>
+      )}
 
       {/* Modal: Select Theme Preset Popover */}
       {isThemeModalOpen && (

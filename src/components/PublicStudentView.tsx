@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode } from 'lucide-react';
 import { Book, College, AISearchResult, AISearchResponse } from '../types';
 import { BookCard } from './BookCard';
 import { BookDetailModal } from './BookDetailModal';
@@ -10,13 +10,15 @@ interface PublicStudentViewProps {
   colleges: College[];
   onSelectCollege: (col: College) => void;
   onOpenLibrarianLogin?: () => void;
+  onOpenQRModal?: () => void;
 }
 
 export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   currentCollege,
   colleges,
   onSelectCollege,
-  onOpenLibrarianLogin
+  onOpenLibrarianLogin,
+  onOpenQRModal
 }) => {
   const { currentPreset } = useTheme();
   // Default search mode is "Search by Book Name"
@@ -131,13 +133,27 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
         {/* Search Header Box */}
         <div className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-6 sm:p-8 text-center space-y-5 transition-all duration-500`}>
           
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
-              Smart AI
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Search any book by title or describe your topic in natural language.
-            </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200/20 pb-4">
+            <div className="text-left">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1.5 flex items-center gap-2">
+                <BookOpen className={`w-7 h-7 ${currentPreset.accentText}`} />
+                <span>Smart AI Finder</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md font-medium">
+                Search books by title or describe your query in conversational English.
+              </p>
+            </div>
+
+            {onOpenQRModal && (
+              <button
+                onClick={onOpenQRModal}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-2xl text-xs font-black shadow-xs hover:scale-[1.02] active:scale-95 transition-all self-stretch sm:self-auto justify-center"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <QrCode className="w-4 h-4" />
+                <span>Library Entrance QR</span>
+              </button>
+            )}
           </div>
 
           {/* Search Mode Tabs: Default "Search by Book Name" first, then "Search with AI" */}

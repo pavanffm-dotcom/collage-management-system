@@ -21,6 +21,7 @@ interface AdminPanelProps {
   onUpdateCollege: (updatedCollege: Partial<College>) => Promise<void>;
   activeTab?: 'add' | 'analytics' | 'qr' | 'settings';
   setActiveTab?: (tab: 'add' | 'analytics' | 'qr' | 'settings') => void;
+  onLogout?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -36,7 +37,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   currentCollege,
   onUpdateCollege,
   activeTab: propActiveTab,
-  setActiveTab: propSetActiveTab
+  setActiveTab: propSetActiveTab,
+  onLogout
 }) => {
   const { currentPreset } = useTheme();
   const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings'>('add');
@@ -595,6 +597,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <SettingsView
           currentCollege={currentCollege}
           onUpdateCollege={onUpdateCollege}
+          onLogout={onLogout}
         />
       )}
 
