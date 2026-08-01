@@ -1,0 +1,6 @@
+{
+  "name": "AI Smart Library Finder",
+  "description": "Smart college library search system allowing students to scan QR codes, search by book title or natural language AI topic descriptions, and view exact physical shelf locations with visual map navigation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
