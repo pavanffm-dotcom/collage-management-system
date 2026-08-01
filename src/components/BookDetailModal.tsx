@@ -3,6 +3,7 @@ import { X, MapPin, BookOpen, Layers, CheckCircle2, Share2, Printer, Tag, Calend
 import { Book } from '../types';
 import { LibraryMap } from './LibraryMap';
 import { useTheme } from '../context/ThemeContext';
+import { motion } from 'motion/react';
 
 interface BookDetailModalProps {
   book: Book | null;
@@ -35,8 +36,20 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialT
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/80 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className={`${currentPreset.modalBg} rounded-3xl max-w-3xl w-full border ${currentPreset.cardBorder} shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col transition-all duration-500`}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/80 backdrop-blur-md overflow-y-auto"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.93, y: 15 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+        className={`${currentPreset.modalBg} rounded-3xl max-w-3xl w-full border ${currentPreset.cardBorder} shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col`}
+      >
         
         {/* Modal Header Banner */}
         <div className={`bg-gradient-to-r ${currentPreset.bannerBg} text-white p-5 sm:p-6 flex items-start justify-between gap-4 border-b border-slate-800`}>
@@ -272,7 +285,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialT
           </button>
         </div>
 
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

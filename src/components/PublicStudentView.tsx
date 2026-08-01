@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode } from 'lucide-react';
 import { Book, College, AISearchResult, AISearchResponse } from '../types';
 import { BookCard } from './BookCard';
 import { BookDetailModal } from './BookDetailModal';
 import { useTheme } from '../context/ThemeContext';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PublicStudentViewProps {
   currentCollege: College | null;
@@ -38,17 +39,13 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
-  // Departments list for filter
-  const departments = Array.from(new Set(books.map(b => b.department))).filter(Boolean);
+  // Departments list for filter (Memoized to prevent recalculated overhead on every render)
+  const departments = useMemo(() => {
+    return Array.from(new Set(books.map(b => b.department))).filter(Boolean);
+  }, [books]);
 
   // Fetch catalog books when college changes
-  useEffect(() => {
-    if (currentCollege) {
-      fetchCollegeBooks(currentCollege.id);
-    }
-  }, [currentCollege]);
-
-  const fetchCollegeBooks = async (collegeId: string) => {
+  const fetchCollegeBooks = useCallback(async (collegeId: string) => {
     setIsSearching(true);
     try {
       const res = await fetch(`/api/books?collegeId=${collegeId}`);
@@ -59,10 +56,16 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (currentCollege) {
+      fetchCollegeBooks(currentCollege.id);
+    }
+  }, [currentCollege, fetchCollegeBooks]);
 
   // Run Exact Search (Search by Book Name)
-  const handleExactSearch = async () => {
+  const handleExactSearch = useCallback(async () => {
     if (!currentCollege) return;
     setIsSearching(true);
     setHasSearched(true);
@@ -85,10 +88,10 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [currentCollege, exactQuery, selectedDept, onlyAvailable]);
 
   // Run AI Search
-  const handleAISearch = async (queryToRun?: string) => {
+  const handleAISearch = useCallback(async (queryToRun?: string) => {
     if (!currentCollege) return;
     const queryStr = queryToRun !== undefined ? queryToRun : aiQuery;
     if (!queryStr.trim()) return;
@@ -115,14 +118,14 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [currentCollege, aiQuery]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       if (searchMode === 'exact') handleExactSearch();
       else handleAISearch();
     }
-  };
+  }, [searchMode, handleExactSearch, handleAISearch]);
 
   return (
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 pb-28 transition-colors duration-500`}>
@@ -131,7 +134,12 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-6">
         
         {/* Search Header Box */}
-        <div className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-6 sm:p-8 text-center space-y-5 transition-all duration-500`}>
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-6 sm:p-8 text-center space-y-5 transition-all duration-500`}
+        >
           
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200/20 pb-4">
             <div className="text-left">
@@ -143,155 +151,174 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                 Search books by title or describe your query in conversational English.
               </p>
             </div>
-
-            {onOpenQRModal && (
-              <button
-                onClick={onOpenQRModal}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-2xl text-xs font-black shadow-xs hover:scale-[1.02] active:scale-95 transition-all self-stretch sm:self-auto justify-center"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <QrCode className="w-4 h-4" />
-                <span>Library Entrance QR</span>
-              </button>
-            )}
           </div>
 
-          {/* Search Mode Tabs: Default "Search by Book Name" first, then "Search with AI" */}
-          <div className={`inline-flex p-1 ${currentPreset.innerCardBg} ${currentPreset.cardRadius} border ${currentPreset.borderColor}`}>
+          {/* Search Mode Tabs with layoutId for fluid active tab sliding */}
+          <div className={`inline-flex p-1 ${currentPreset.innerCardBg} ${currentPreset.cardRadius} border ${currentPreset.borderColor} relative`}>
             <button
               onClick={() => { setSearchMode('exact'); setHasSearched(false); }}
-              className={`flex items-center gap-2 px-5 py-2.5 ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all ${
-                searchMode === 'exact'
-                  ? `${currentPreset.buttonBg} shadow-md`
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className="relative flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold transition-all select-none z-10 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             >
-              <Search className="w-4 h-4" />
-              <span>Search by Book Name</span>
+              {searchMode === 'exact' && (
+                <motion.div
+                  layoutId="activeSearchTab"
+                  className={`absolute inset-0 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} shadow-md -z-10`}
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Search className={`w-4 h-4 ${searchMode === 'exact' ? 'text-white' : ''}`} />
+              <span className={searchMode === 'exact' ? 'text-white font-black' : ''}>Search by Book Name</span>
             </button>
 
             <button
               onClick={() => { setSearchMode('ai'); setHasSearched(false); }}
-              className={`flex items-center gap-2 px-5 py-2.5 ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all ${
-                searchMode === 'ai'
-                  ? `${currentPreset.buttonBg} shadow-md`
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className="relative flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold transition-all select-none z-10 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Search with AI</span>
+              {searchMode === 'ai' && (
+                <motion.div
+                  layoutId="activeSearchTab"
+                  className={`absolute inset-0 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} shadow-md -z-10`}
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Sparkles className={`w-4 h-4 text-amber-300 ${searchMode === 'ai' ? 'text-white' : ''}`} />
+              <span className={searchMode === 'ai' ? 'text-white font-black' : ''}>Search with AI</span>
             </button>
           </div>
 
-          {/* Search Input Box */}
-          {searchMode === 'exact' ? (
-            <div className="max-w-2xl mx-auto space-y-4">
-              <div className={`relative flex items-center ${currentPreset.inputBg} ${currentPreset.inputRadius} p-2 border ${currentPreset.borderColor} transition-all`}>
-                <Search className={`w-5 h-5 ml-3 mr-2 ${currentPreset.accentText}`} />
-                <input
-                  type="text"
-                  value={exactQuery}
-                  onChange={e => setExactQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Enter book title, author, or subject name..."
-                  className="w-full py-2.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
-                />
-                {exactQuery && (
-                  <button onClick={() => setExactQuery('')} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  onClick={handleExactSearch}
-                  disabled={isSearching}
-                  className={`py-2.5 px-5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50`}
+          {/* Search Input Box with AnimatePresence for flawless transitions */}
+          <div className="overflow-hidden">
+            <AnimatePresence mode="wait">
+              {searchMode === 'exact' ? (
+                <motion.div
+                  key="exact"
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 15 }}
+                  transition={{ duration: 0.2 }}
+                  className="max-w-2xl mx-auto space-y-4"
                 >
-                  {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Search</span>}
-                </button>
-              </div>
-
-              {/* Filters */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-slate-600 dark:text-slate-400">
-                <div className="flex items-center gap-2">
-                  <Filter className={`w-3.5 h-3.5 ${currentPreset.accentText}`} />
-                  <span>Department:</span>
-                  <select
-                    value={selectedDept}
-                    onChange={e => setSelectedDept(e.target.value)}
-                    className={`${currentPreset.inputBg} ${currentPreset.buttonRadius} px-2.5 py-1 text-xs text-slate-900 dark:text-white`}
-                  >
-                    <option value="All">All Departments</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={onlyAvailable}
-                    onChange={e => setOnlyAvailable(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>Show Only Available Books</span>
-                </label>
-              </div>
-            </div>
-          ) : (
-            <div className="max-w-2xl mx-auto space-y-4">
-              <div className={`relative flex items-center ${currentPreset.inputBg} ${currentPreset.inputRadius} p-2 border ${currentPreset.borderColor} transition-all`}>
-                <Sparkles className="w-5 h-5 text-amber-500 ml-3 mr-2" />
-                <input
-                  type="text"
-                  value={aiQuery}
-                  onChange={e => setAiQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder='Describe topic in plain English... e.g. "I need a Fish Curry book"'
-                  className="w-full py-2.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
-                />
-                {aiQuery && (
-                  <button onClick={() => setAiQuery('')} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  onClick={() => handleAISearch()}
-                  disabled={isSearching}
-                  className={`py-2.5 px-5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50`}
-                >
-                  {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>AI Search</span>}
-                </button>
-              </div>
-
-              {/* Sample Natural Queries */}
-              <div className="text-left pt-1">
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                  Try asking in natural language:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Fish Curry of Goa',
-                    'Python beginners book',
-                    'Java Interview Preparation',
-                    'Indian Constitution',
-                    'Organic Chemistry'
-                  ].map((q, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setAiQuery(q);
-                        handleAISearch(q);
-                      }}
-                      className={`text-[11px] py-1 px-2.5 ${currentPreset.badgeRadius} ${currentPreset.secondaryButtonBg} transition-colors`}
+                  <div className={`relative flex items-center ${currentPreset.inputBg} ${currentPreset.inputRadius} p-2 border ${currentPreset.borderColor} transition-all`}>
+                    <Search className={`w-5 h-5 ml-3 mr-2 ${currentPreset.accentText}`} />
+                    <input
+                      type="text"
+                      value={exactQuery}
+                      onChange={e => setExactQuery(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Enter book title, author, or subject name..."
+                      className="w-full py-2.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                    />
+                    {exactQuery && (
+                      <button onClick={() => setExactQuery('')} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleExactSearch}
+                      disabled={isSearching}
+                      className={`py-2.5 px-5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50`}
                     >
-                      "{q}"
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+                      {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Search</span>}
+                    </motion.button>
+                  </div>
 
-        </div>
+                  {/* Filters */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <Filter className={`w-3.5 h-3.5 ${currentPreset.accentText}`} />
+                      <span>Department:</span>
+                      <select
+                        value={selectedDept}
+                        onChange={e => setSelectedDept(e.target.value)}
+                        className={`${currentPreset.inputBg} ${currentPreset.buttonRadius} px-2.5 py-1 text-xs text-slate-900 dark:text-white`}
+                      >
+                        <option value="All">All Departments</option>
+                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={onlyAvailable}
+                        onChange={e => setOnlyAvailable(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Show Only Available Books</span>
+                    </label>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="ai"
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  transition={{ duration: 0.2 }}
+                  className="max-w-2xl mx-auto space-y-4"
+                >
+                  <div className={`relative flex items-center ${currentPreset.inputBg} ${currentPreset.inputRadius} p-2 border ${currentPreset.borderColor} transition-all`}>
+                    <Sparkles className="w-5 h-5 text-amber-500 ml-3 mr-2" />
+                    <input
+                      type="text"
+                      value={aiQuery}
+                      onChange={e => setAiQuery(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder='Describe topic in plain English... e.g. "I need a Fish Curry book"'
+                      className="w-full py-2.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                    />
+                    {aiQuery && (
+                      <button onClick={() => setAiQuery('')} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleAISearch()}
+                      disabled={isSearching}
+                      className={`py-2.5 px-5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50`}
+                    >
+                      {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>AI Search</span>}
+                    </motion.button>
+                  </div>
+
+                  {/* Sample Natural Queries */}
+                  <div className="text-left pt-1">
+                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                      Try asking in natural language:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'Fish Curry of Goa',
+                        'Python beginners book',
+                        'Java Interview Preparation',
+                        'Indian Constitution',
+                        'Organic Chemistry'
+                      ].map((q, idx) => (
+                        <motion.button
+                          key={idx}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setAiQuery(q);
+                            handleAISearch(q);
+                          }}
+                          className={`text-[11px] py-1 px-2.5 ${currentPreset.badgeRadius} ${currentPreset.secondaryButtonBg} transition-colors cursor-pointer`}
+                        >
+                          "{q}"
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+        </motion.div>
 
         {/* Results Section */}
         <div className="space-y-6">
@@ -313,76 +340,143 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
 
           {/* AI Concept Badges */}
           {searchMode === 'ai' && extractedConcepts.length > 0 && (
-            <div className={`flex items-center gap-2 flex-wrap p-3 rounded-2xl ${currentPreset.badgeBg}`}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`flex items-center gap-2 flex-wrap p-3 rounded-2xl ${currentPreset.badgeBg}`}
+            >
               <span className="text-xs font-bold flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 AI Understood Concepts:
               </span>
               {extractedConcepts.map((concept, idx) => (
-                <span
+                <motion.span
                   key={idx}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
                   className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${currentPreset.innerCardBg} text-slate-800 dark:text-slate-200 border ${currentPreset.borderColor} shadow-xs`}
                 >
                   {concept}
-                </span>
+                </motion.span>
               ))}
-            </div>
+            </motion.div>
           )}
 
-          {/* Content Listing */}
-          {isSearching ? (
-            <div className="py-16 text-center space-y-3">
-              <div className="w-10 h-10 border-4 border-slate-400 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                Searching library catalog...
-              </p>
-            </div>
-          ) : searchMode === 'exact' ? (
-            books.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {books.map(book => (
-                  <BookCard
-                    key={book.id}
-                    book={book}
-                    onSelectBook={setSelectedBook}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className={`py-12 px-4 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-3`}>
-                <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
-                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                  No Books Found
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  "{exactQuery}" was not found in the library catalog.
+          {/* Content Listing with Staggered Animations */}
+          <AnimatePresence mode="wait">
+            {isSearching ? (
+              <motion.div 
+                key="searching"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="py-16 text-center space-y-3"
+              >
+                <div className="w-10 h-10 border-4 border-slate-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  Searching library catalog...
                 </p>
-              </div>
-            )
-          ) : (
-            aiResults.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {aiResults.map(res => (
-                  <BookCard
-                    key={res.book.id}
-                    book={res.book}
-                    aiResult={res}
-                    onSelectBook={setSelectedBook}
-                  />
-                ))}
-              </div>
+              </motion.div>
+            ) : searchMode === 'exact' ? (
+              books.length > 0 ? (
+                <motion.div 
+                  key="books-list"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                      opacity: 1,
+                      transition: {
+                        staggerChildren: 0.05
+                      }
+                    }
+                  }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                  {books.map(book => (
+                    <motion.div
+                      key={book.id}
+                      variants={{
+                        hidden: { opacity: 0, y: 15 },
+                        visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
+                      }}
+                    >
+                      <BookCard
+                        book={book}
+                        onSelectBook={setSelectedBook}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="no-books"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`py-12 px-4 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-3`}
+                >
+                  <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
+                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                    No Books Found
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    "{exactQuery}" was not found in the library catalog.
+                  </p>
+                </motion.div>
+              )
             ) : (
-              <div className={`py-12 px-4 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-3`}>
-                <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
-                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                  No Relevant AI Match
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  We could not find matching books for topic "{aiQuery}".
-                </p>
-              </div>
-            )
-          )}
+              aiResults.length > 0 ? (
+                <motion.div 
+                  key="ai-results-list"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                      opacity: 1,
+                      transition: {
+                        staggerChildren: 0.05
+                      }
+                    }
+                  }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                  {aiResults.map(res => (
+                    <motion.div
+                      key={res.book.id}
+                      variants={{
+                        hidden: { opacity: 0, y: 15 },
+                        visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
+                      }}
+                    >
+                      <BookCard
+                        book={res.book}
+                        aiResult={res}
+                        onSelectBook={setSelectedBook}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="no-ai-results"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`py-12 px-4 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-3`}
+                >
+                  <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
+                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                    No Relevant AI Match
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    We could not find matching books for topic "{aiQuery}".
+                  </p>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
 
         </div>
 

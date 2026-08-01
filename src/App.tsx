@@ -6,7 +6,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { QRModal } from './components/QRModal';
 import { HomePortal } from './components/HomePortal';
-import { BookOpen, Search, PlusCircle, BarChart2, Settings } from 'lucide-react';
+import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode } from 'lucide-react';
 
 // Departments View imports
 import { WorkInProgressView } from './components/WorkInProgressView';
@@ -101,12 +101,12 @@ function AppContent({
 
   // Once signed in, render the appropriate Department View
   return (
-    <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-500 relative overflow-hidden`}>
+    <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 flex flex-col lg:flex-row font-sans transition-colors duration-500 relative overflow-hidden`}>
       
       {/* Ambient Theme Background Glow */}
       <div className={`absolute top-0 inset-x-0 h-[480px] bg-gradient-to-b ${currentPreset.gradientBg} opacity-80 pointer-events-none blur-3xl transition-all duration-700`} />
 
-      {/* Navigation Header */}
+      {/* Navigation Header / Left Sidebar */}
       <Header
         currentCollege={currentCollege}
         authUser={authUser}
@@ -122,221 +122,101 @@ function AppContent({
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
       />
 
-      {/* Entrance QR Generator & Simulator Modal */}
-      <QRModal
-        isOpen={isQRModalOpen}
-        onClose={() => setIsQRModalOpen(false)}
-        currentCollege={currentCollege}
-        onSimulateScan={() => {
-          setSelectedDept('library');
-          setActiveView('public');
-        }}
-      />
+      {/* Main Content Area (Wraps QRModal, main & footer to scroll independently from sidebar) */}
+      <div className="flex-1 flex flex-col min-w-0 lg:h-screen lg:overflow-y-auto relative z-10 w-full">
+        {/* Entrance QR Generator & Simulator Modal */}
+        <QRModal
+          isOpen={isQRModalOpen}
+          onClose={() => setIsQRModalOpen(false)}
+          currentCollege={currentCollege}
+          onSimulateScan={() => {
+            setSelectedDept('library');
+            setActiveView('public');
+          }}
+        />
 
-      {/* Main Application Body Container */}
-      <main className="flex-1 pb-16 md:pb-8 z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        {selectedDept === 'library' ? (
-          <div className="space-y-6">
-            
-            {/* Library On-Page Operations Switcher Hub */}
-            <div className="p-6 bg-white/65 dark:bg-zinc-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-zinc-800/40 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                  <BookOpen className={`w-6 h-6 ${currentPreset.accentText}`} />
-                  <span>Library Operations Hub</span>
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  {currentCollege?.name || 'Central Campus Library'} • Dynamic database, live search & logs
-                </p>
-              </div>
-
-              {/* Status Badge with Active Role */}
-              <div className="flex items-center gap-2 self-start md:self-auto bg-slate-500/5 px-3 py-1.5 rounded-xl border border-slate-200/10">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                  Role: <span className={`${currentPreset.accentText} uppercase tracking-wider`}>{authUser?.role || 'Guest Student'}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* The 4 Library Hub Navigation Cards (Buttons) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Main Application Body Container */}
+        <main className="flex-1 pb-16 md:pb-8 z-10 px-4 sm:px-6 lg:px-10 py-6 w-full max-w-full">
+          {selectedDept === 'library' ? (
+            <div className="space-y-6">
               
-              {/* Button 1: Student Find */}
-              <button
-                onClick={() => {
-                  setActiveView('public');
-                }}
-                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
-                  activeView === 'public'
-                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
-                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className={`p-2.5 rounded-xl bg-indigo-500 text-white shrink-0`}>
-                    <Search className="w-4.5 h-4.5" />
-                  </div>
-                  {activeView === 'public' && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                  )}
+              {/* Library On-Page Operations Switcher Hub */}
+              <div className="p-6 bg-white/65 dark:bg-zinc-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-zinc-800/40 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                    <BookOpen className={`w-6 h-6 ${currentPreset.accentText}`} />
+                    <span>Library Operations Hub</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    {currentCollege?.name || 'Central Campus Library'} • Dynamic database, live search & logs
+                  </p>
                 </div>
-                <div className="mt-4">
-                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
-                    Student Find
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
-                    Catalog & AI Search
-                  </span>
-                </div>
-              </button>
 
-              {/* Button 2: Add Books */}
-              <button
-                onClick={() => {
-                  setActiveView('admin');
-                  setAdminTab('add');
-                }}
-                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
-                  activeView === 'admin' && adminTab === 'add'
-                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
-                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className={`p-2.5 rounded-xl bg-emerald-500 text-white shrink-0`}>
-                    <PlusCircle className="w-4.5 h-4.5" />
-                  </div>
-                  {activeView === 'admin' && adminTab === 'add' && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  )}
-                </div>
-                <div className="mt-4">
-                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
-                    Add Books
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
-                    Insert & Bulk Import
+                {/* Status Badge with Active Role */}
+                <div className="flex items-center gap-2 self-start md:self-auto bg-slate-500/5 px-3 py-1.5 rounded-xl border border-slate-200/10">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                    Role: <span className={`${currentPreset.accentText} uppercase tracking-wider`}>{authUser?.role || 'Guest Student'}</span>
                   </span>
                 </div>
-              </button>
+              </div>
 
-              {/* Button 3: Books Analysis */}
-              <button
-                onClick={() => {
-                  setActiveView('admin');
-                  setAdminTab('analytics');
-                }}
-                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
-                  activeView === 'admin' && adminTab === 'analytics'
-                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
-                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className={`p-2.5 rounded-xl bg-amber-500 text-white shrink-0`}>
-                    <BarChart2 className="w-4.5 h-4.5" />
-                  </div>
-                  {activeView === 'admin' && adminTab === 'analytics' && (
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  )}
-                </div>
-                <div className="mt-4">
-                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
-                    Books Analysis
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
-                    Query Trends & Inventory
-                  </span>
-                </div>
-              </button>
-
-              {/* Button 4: Settings & Config */}
-              <button
-                onClick={() => {
-                  setActiveView('admin');
-                  setAdminTab('settings');
-                }}
-                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between shadow-xs hover:scale-[1.01] active:scale-95 ${
-                  activeView === 'admin' && adminTab === 'settings'
-                    ? `${currentPreset.badgeBg} border-indigo-500/30 ring-2 ring-indigo-500/10`
-                    : 'bg-white/45 dark:bg-zinc-900/30 border-slate-200/50 dark:border-zinc-800/45 hover:bg-white/60 dark:hover:bg-zinc-900/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className={`p-2.5 rounded-xl bg-purple-500 text-white shrink-0`}>
-                    <Settings className="w-4.5 h-4.5" />
-                  </div>
-                  {activeView === 'admin' && adminTab === 'settings' && (
-                    <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  )}
-                </div>
-                <div className="mt-4">
-                  <span className="text-xs font-extrabold text-slate-900 dark:text-white block uppercase tracking-wider">
-                    Settings & Config
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mt-0.5">
-                    Campus Profile Setup
-                  </span>
-                </div>
-              </button>
-
+              {/* Render Active Subsection */}
+              <div className="pt-2">
+                {activeView === 'public' ? (
+                  <PublicStudentView
+                    currentCollege={currentCollege}
+                    colleges={colleges}
+                    onSelectCollege={(col) => setCurrentCollege(col)}
+                    onOpenLibrarianLogin={() => setIsAuthModalOpen(true)}
+                    onOpenQRModal={() => setIsQRModalOpen(true)}
+                  />
+                ) : (
+                  <AdminPanel
+                    books={books}
+                    onAddBook={handleAddBook}
+                    onBulkAddBooks={handleBulkAddBooks}
+                    onUpdateBook={handleUpdateBook}
+                    onDeleteBook={handleDeleteBook}
+                    stats={stats}
+                    recentLogs={recentLogs}
+                    onRefreshStats={() => currentCollege && fetchAdminStats(currentCollege.id)}
+                    departments={departments}
+                    currentCollege={currentCollege}
+                    onUpdateCollege={handleUpdateCollege}
+                    activeTab={adminTab}
+                    setActiveTab={setAdminTab}
+                    onLogout={handleLogout}
+                    authUser={authUser}
+                  />
+                )}
+              </div>
             </div>
+          ) : (
+            /* Render Work in Progress View for other departments */
+            <WorkInProgressView 
+              selectedDept={selectedDept}
+              onBackToLibrary={() => {
+                setSelectedDept('library');
+                setActiveView('public');
+              }}
+            />
+          )}
+        </main>
 
-            {/* Render Active Subsection */}
-            <div className="pt-2">
-              {activeView === 'public' ? (
-                <PublicStudentView
-                  currentCollege={currentCollege}
-                  colleges={colleges}
-                  onSelectCollege={(col) => setCurrentCollege(col)}
-                  onOpenLibrarianLogin={() => setIsAuthModalOpen(true)}
-                  onOpenQRModal={() => setIsQRModalOpen(true)}
-                />
-              ) : (
-                <AdminPanel
-                  books={books}
-                  onAddBook={handleAddBook}
-                  onBulkAddBooks={handleBulkAddBooks}
-                  onUpdateBook={handleUpdateBook}
-                  onDeleteBook={handleDeleteBook}
-                  stats={stats}
-                  recentLogs={recentLogs}
-                  onRefreshStats={() => currentCollege && fetchAdminStats(currentCollege.id)}
-                  departments={departments}
-                  currentCollege={currentCollege}
-                  onUpdateCollege={handleUpdateCollege}
-                  activeTab={adminTab}
-                  setActiveTab={setAdminTab}
-                  onLogout={handleLogout}
-                />
-              )}
+        {/* Footer */}
+        <footer className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 z-10 w-full mt-auto">
+          <div className="w-full px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+              <span>Smart College CMS Portal • {currentCollege?.name || 'Central College Campus'}</span>
+            </div>
+            <div>
+              Logged in as {authUser.name} ({authUser.role}) • All modules secured with AES-256
             </div>
           </div>
-        ) : (
-          /* Render Work in Progress View for other departments */
-          <WorkInProgressView 
-            selectedDept={selectedDept}
-            onBackToLibrary={() => {
-              setSelectedDept('library');
-              setActiveView('public');
-            }}
-          />
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 z-10">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-medium">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
-            <span>Smart College CMS Portal • {currentCollege?.name || 'Central College Campus'}</span>
-          </div>
-          <div>
-            Logged in as {authUser.name} ({authUser.role}) • All modules secured with AES-256
-          </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
 
     </div>
   );
@@ -350,7 +230,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState<{ name: string; email: string; collegeId: string; role: string; selectedDept?: string } | null>(null);
   const [selectedDept, setSelectedDept] = useState<string>('library');
   const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
-  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings'>('add');
+  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
   
   // Modal States
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -538,8 +418,13 @@ export default function App() {
     setSelectedDept(user.selectedDept);
     
     // Set view according to role
-    if (user.role === 'Librarian' || user.role === 'Admin' || user.role === 'HOD') {
+    if (user.role === 'Librarian' || user.role === 'Admin' || user.role === 'HOD' || user.role === 'Staff') {
       setActiveView('admin');
+      if (user.role === 'Staff') {
+        setAdminTab('circulation');
+      } else {
+        setAdminTab('add');
+      }
     } else {
       setActiveView('public');
     }

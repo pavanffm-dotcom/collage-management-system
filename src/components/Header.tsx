@@ -18,7 +18,8 @@ import {
   School,
   ChevronDown,
   User,
-  Palette
+  Palette,
+  RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { College } from '../types';
@@ -31,8 +32,8 @@ interface HeaderProps {
   onOpenQRModal: () => void;
   activeView: 'public' | 'admin';
   setActiveView: (view: 'public' | 'admin') => void;
-  adminTab: 'add' | 'analytics' | 'qr' | 'settings';
-  setAdminTab: (tab: 'add' | 'analytics' | 'qr' | 'settings') => void;
+  adminTab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory';
+  setAdminTab: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => void;
   
   // Department-switching parameters
   selectedDept?: string;
@@ -70,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
   const currentDeptObj = departments.find(d => d.id === selectedDept) || departments[0];
   const CurrentDeptIcon = currentDeptObj.icon;
 
-  const handleTabClick = (targetView: 'public' | 'admin', tab?: 'add' | 'analytics' | 'qr' | 'settings') => {
+  const handleTabClick = (targetView: 'public' | 'admin', tab?: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => {
     setActiveView(targetView);
     if (tab) {
       setAdminTab(tab);
@@ -79,7 +80,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className={`sticky top-0 z-40 ${currentPreset.headerBg} border-b border-slate-200/40 dark:border-zinc-800/40 backdrop-blur-xl transition-colors duration-500`}>
+      {/* Mobile & Tablet Header (Hidden on Desktop ONLY if logged in) */}
+      <header className={`${authUser ? 'lg:hidden' : ''} sticky top-0 z-40 ${currentPreset.headerBg} border-b border-slate-200/40 dark:border-zinc-800/40 backdrop-blur-xl transition-colors duration-500`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
           
           {/* Brand Logo & Department Dropdown Switcher */}
@@ -104,112 +106,67 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="h-6 w-[1px] bg-slate-200 dark:bg-zinc-800" />
             )}
 
-            {/* Department Dropdown Switcher */}
-            {authUser && onSelectDept && (
-              <div className="relative">
-                <button
-                  onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-zinc-700/60 transition-all select-none"
-                >
-                  <CurrentDeptIcon className={`w-4 h-4 ${currentDeptObj.color}`} />
-                  <span className="truncate max-w-[100px] sm:max-w-[160px]">{currentDeptObj.name}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {isDeptDropdownOpen && (
-                  <>
-                    {/* Overlay click shield */}
-                    <div className="fixed inset-0 z-10" onClick={() => setIsDeptDropdownOpen(false)} />
-                    
-                    <div className="absolute top-full left-0 mt-1.5 w-56 sm:w-64 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800 shadow-xl py-1.5 z-20">
-                      <span className="text-[10px] font-bold text-slate-400 px-3 py-1.5 block uppercase tracking-wider border-b border-slate-100 dark:border-zinc-800 mb-1">
-                        Switch Department View
-                      </span>
-                      {departments.map((dept) => {
-                        const DeptIcon = dept.icon;
-                        const isSelected = selectedDept === dept.id;
-                        return (
-                          <button
-                            key={dept.id}
-                            onClick={() => {
-                              onSelectDept(dept.id);
-                              setIsDeptDropdownOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors ${
-                              isSelected
-                                ? 'bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400'
-                                : 'text-slate-750 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <DeptIcon className={`w-4 h-4 ${dept.color}`} />
-                              <span>{dept.name}</span>
-                            </div>
-                            {isSelected && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+            {/* Active Department Badge (Read-Only when Logged In) */}
+            {authUser ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60 text-xs font-black text-slate-750 dark:text-slate-300 select-none">
+                <CurrentDeptIcon className={`w-4 h-4 ${currentDeptObj.color}`} />
+                <span className="truncate max-w-[120px] sm:max-w-[160px] uppercase tracking-wider text-[10px]">{currentDeptObj.name}</span>
               </div>
+            ) : (
+              /* Department Dropdown Switcher for Guests */
+              onSelectDept && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-zinc-700/60 transition-all select-none"
+                  >
+                    <CurrentDeptIcon className={`w-4 h-4 ${currentDeptObj.color}`} />
+                    <span className="truncate max-w-[100px] sm:max-w-[160px]">{currentDeptObj.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+
+                  {isDeptDropdownOpen && (
+                    <>
+                      {/* Overlay click shield */}
+                      <div className="fixed inset-0 z-10" onClick={() => setIsDeptDropdownOpen(false)} />
+                      
+                      <div className="absolute top-full left-0 mt-1.5 w-56 sm:w-64 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800 shadow-xl py-1.5 z-20">
+                        <span className="text-[10px] font-bold text-slate-400 px-3 py-1.5 block uppercase tracking-wider border-b border-slate-100 dark:border-zinc-800 mb-1">
+                          Switch Department View
+                        </span>
+                        {departments.map((dept) => {
+                          const DeptIcon = dept.icon;
+                          const isSelected = selectedDept === dept.id;
+                          return (
+                            <button
+                              key={dept.id}
+                              onClick={() => {
+                                onSelectDept(dept.id);
+                                setIsDeptDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors ${
+                                isSelected
+                                  ? 'bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400'
+                                  : 'text-slate-750 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <DeptIcon className={`w-4 h-4 ${dept.color}`} />
+                                <span>{dept.name}</span>
+                              </div>
+                              {isSelected && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
             )}
           </div>
-
-          {/* Center Navigation - Standard Library management tabs only shown if 'library' is selected */}
-          {authUser && selectedDept === 'library' && (
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 dark:bg-zinc-900/40 backdrop-blur-md p-1 rounded-2xl border border-slate-200/40 dark:border-zinc-800/40">
-              <button
-                onClick={() => handleTabClick('public')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeView === 'public'
-                    ? `${currentPreset.badgeBg} shadow-sm font-extrabold scale-[1.02]`
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <Search className="w-4 h-4" />
-                <span>Student Find</span>
-              </button>
-
-              <button
-                onClick={() => handleTabClick('admin', 'add')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeView === 'admin' && adminTab === 'add'
-                    ? `${currentPreset.badgeBg} shadow-sm font-extrabold scale-[1.02]`
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Add Books</span>
-              </button>
-
-              <button
-                onClick={() => handleTabClick('admin', 'analytics')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeView === 'admin' && adminTab === 'analytics'
-                    ? `${currentPreset.badgeBg} shadow-sm font-extrabold scale-[1.02]`
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <BarChart2 className="w-4 h-4" />
-                <span>Analytics</span>
-              </button>
-
-              <button
-                onClick={() => handleTabClick('admin', 'settings')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeView === 'admin' && adminTab === 'settings'
-                    ? `${currentPreset.badgeBg} shadow-sm font-extrabold scale-[1.02]`
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </button>
-            </nav>
-          )}
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2">
@@ -252,18 +209,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Library Entrance QR Button */}
-            {onOpenQRModal && selectedDept === 'library' && (
-              <button
-                onClick={onOpenQRModal}
-                className="p-2 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-xl transition-all border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center gap-1.5"
-                title="View Library Entrance QR Code"
-              >
-                <QrCode className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-bold hidden sm:inline text-slate-700 dark:text-slate-300">Entrance QR</span>
-              </button>
-            )}
-
             {/* Theme Customizer Button */}
             {onOpenThemeModal && (
               <button
@@ -290,59 +235,350 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
         </div>
+
+        {/* Mobile & Tablet Horizontal Tab Switcher Sub-Navigation (Highly compact & styled) */}
+        {authUser && selectedDept === 'library' && (
+          <div className="lg:hidden border-t border-slate-200/40 dark:border-zinc-800/40 px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+            <button
+              onClick={() => handleTabClick('public')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                activeView === 'public'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Student Find</span>
+            </button>
+
+            {/* Circulation Counter Tab */}
+            <button
+              onClick={() => handleTabClick('admin', 'circulation')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                activeView === 'admin' && adminTab === 'circulation'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+              }`}
+            >
+              <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+              <span>Circulation</span>
+            </button>
+
+            {/* Cataloging & Add Books Tab (Librarian/Admin only) */}
+            {authUser.role !== 'Staff' && (
+              <button
+                onClick={() => handleTabClick('admin', 'add')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                  activeView === 'admin' && adminTab === 'add'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+                }`}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Add Books</span>
+              </button>
+            )}
+
+            {/* Analytics Tab (Librarian/Admin only) */}
+            {authUser.role !== 'Staff' && (
+              <button
+                onClick={() => handleTabClick('admin', 'analytics')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                  activeView === 'admin' && adminTab === 'analytics'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>Analytics</span>
+              </button>
+            )}
+
+            {/* Library Directory Tab */}
+            <button
+              onClick={() => handleTabClick('admin', 'directory')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                activeView === 'admin' && adminTab === 'directory'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Directory</span>
+            </button>
+
+            {/* Settings Tab (Librarian/Admin only) */}
+            {authUser.role !== 'Staff' && (
+              <button
+                onClick={() => handleTabClick('admin', 'settings')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
+                  activeView === 'admin' && adminTab === 'settings'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Settings</span>
+              </button>
+            )}
+
+            <button
+              onClick={onOpenQRModal}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Entrance QR</span>
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* Persistent Bottom Tab Bar for Mobile / Tablet Library users */}
-      {authUser && selectedDept === 'library' && (
-        <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-lg border-t border-slate-200/60 dark:border-zinc-800/80 shadow-lg py-2 px-6 flex items-center justify-around z-50 md:hidden pb-safe">
-          <button
+      {/* Persistent Left Sidebar (Visible only on Desktop - lg: screens) */}
+      {authUser && (
+        <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:h-screen lg:sticky lg:top-0 lg:shrink-0 border-r border-slate-200/40 dark:border-zinc-800/40 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl z-30 overflow-y-auto p-5 justify-between">
+        {/* Sidebar Top: Logo and Campus Profile */}
+        <div className="space-y-6">
+          <div 
             onClick={() => handleTabClick('public')}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeView === 'public'
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <Search className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Student Find</span>
-          </button>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-md transition-all group-hover:scale-105">
+              <School className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                Smart CMS
+              </h1>
+              <span className="text-[10px] text-slate-400 font-semibold block">College Management</span>
+            </div>
+          </div>
 
-          <button
-            onClick={() => handleTabClick('admin', 'add')}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeView === 'admin' && adminTab === 'add'
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <PlusCircle className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Add Books</span>
-          </button>
+          {currentCollege && (
+            <div className="p-3 bg-slate-500/5 rounded-2xl border border-slate-200/10 text-left">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Campus Profile</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate">{currentCollege.name}</span>
+            </div>
+          )}
 
-          <button
-            onClick={() => handleTabClick('admin', 'analytics')}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeView === 'admin' && adminTab === 'analytics'
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <BarChart2 className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Analytics</span>
-          </button>
+          {/* Sidebar Navigation - Main Departments */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                {selectedDept ? 'Active Department' : 'Departments'}
+              </span>
+              {selectedDept && onSelectDept && !authUser && (
+                <button
+                  onClick={() => onSelectDept('')}
+                  className="text-[9px] font-extrabold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-wider transition-colors"
+                >
+                  Switch
+                </button>
+              )}
+            </div>
+            <div className="space-y-1">
+              {departments
+                .filter((dept) => !selectedDept || selectedDept === dept.id)
+                .map((dept) => {
+                  const DeptIcon = dept.icon;
+                  const isSelected = selectedDept === dept.id;
+                  return (
+                    <button
+                      key={dept.id}
+                      onClick={() => onSelectDept && onSelectDept(dept.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        isSelected
+                          ? `${currentPreset.badgeBg} text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-indigo-500/10`
+                          : 'text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-800/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <DeptIcon className={`w-4 h-4 ${dept.color}`} />
+                        <span className="truncate">{dept.name}</span>
+                      </div>
+                      {isSelected && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
 
-          <button
-            onClick={() => handleTabClick('admin', 'settings')}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeView === 'admin' && adminTab === 'settings'
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Settings className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Settings</span>
-          </button>
+          {/* Sub-Navigation: Specific Tab Actions for active department (Library) */}
+          {authUser && selectedDept === 'library' && (
+            <div className="space-y-2 pt-2 border-t border-slate-200/40 dark:border-zinc-800/40">
+              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block px-2">
+                Library Operations
+              </span>
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleTabClick('public')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeView === 'public'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-855'
+                  }`}
+                >
+                  <Search className="w-4 h-4 text-indigo-500" />
+                  <span>Student Find</span>
+                </button>
+
+                {/* Circulation Desk Tab */}
+                <button
+                  onClick={() => handleTabClick('admin', 'circulation')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeView === 'admin' && adminTab === 'circulation'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                  }`}
+                >
+                  <RefreshCw className="w-4 h-4 text-indigo-500" />
+                  <span>Circulation Desk</span>
+                </button>
+
+                {/* Cataloging & Add Books Tab (Librarian/Admin only) */}
+                {authUser.role !== 'Staff' && (
+                  <button
+                    onClick={() => handleTabClick('admin', 'add')}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      activeView === 'admin' && adminTab === 'add'
+                        ? 'bg-slate-100 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                    }`}
+                  >
+                    <PlusCircle className="w-4 h-4 text-emerald-500" />
+                    <span>Add Books</span>
+                  </button>
+                )}
+
+                {/* Analytics Tab (Librarian/Admin only) */}
+                {authUser.role !== 'Staff' && (
+                  <button
+                    onClick={() => handleTabClick('admin', 'analytics')}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      activeView === 'admin' && adminTab === 'analytics'
+                        ? 'bg-slate-100 dark:bg-zinc-800 text-amber-600 dark:text-amber-400 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                    }`}
+                  >
+                    <BarChart2 className="w-4 h-4 text-amber-500" />
+                    <span>Analytics</span>
+                  </button>
+                )}
+
+                {/* Staff Directory Tab */}
+                <button
+                  onClick={() => handleTabClick('admin', 'directory')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeView === 'admin' && adminTab === 'directory'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-emerald-500" />
+                  <span>Library Directory</span>
+                </button>
+
+                {/* Settings Tab (Librarian/Admin only) */}
+                {authUser.role !== 'Staff' && (
+                  <button
+                    onClick={() => handleTabClick('admin', 'settings')}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      activeView === 'admin' && adminTab === 'settings'
+                        ? 'bg-slate-100 dark:bg-zinc-800 text-purple-600 dark:text-purple-400 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 text-purple-500" />
+                    <span>Settings</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={onOpenQRModal}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850"
+                >
+                  <QrCode className="w-4 h-4 text-emerald-500" />
+                  <span>Entrance QR</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Sidebar Bottom: User Profile and Utility Bar */}
+        <div className="space-y-4 pt-4 border-t border-slate-200/40 dark:border-zinc-800/40">
+          
+          {/* Profile summary card */}
+          {authUser ? (
+            <div className="p-3 bg-slate-500/5 rounded-2xl border border-slate-200/10 flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <img 
+                  src={authUser.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authUser.name)}`} 
+                  alt={authUser.name} 
+                  className="w-8 h-8 rounded-full border border-slate-200/60 object-cover shadow-xs shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="text-left overflow-hidden">
+                  <span className="text-xs font-extrabold text-slate-850 dark:text-slate-250 block leading-tight truncate">
+                    {authUser.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide truncate">
+                    {authUser.role}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                className="p-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-all shrink-0"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenAuthModal}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Librarian Login</span>
+            </button>
+          )}
+
+          {/* Theme Options & Theme Toggles row */}
+          <div className="flex items-center justify-between gap-1.5">
+            
+            {/* Theme customization shortcut */}
+            {onOpenThemeModal && (
+              <button
+                onClick={onOpenThemeModal}
+                className="w-1/2 p-2 text-indigo-500 bg-slate-500/5 hover:bg-slate-500/10 border border-slate-200/10 rounded-xl transition-all flex items-center justify-center shrink-0"
+                title="Customize Theme"
+              >
+                <Palette className="w-4 h-4" />
+                <span className="text-[10px] font-bold ml-1">Theme</span>
+              </button>
+            )}
+
+            {/* Light/Dark mode toggler */}
+            <button
+              onClick={toggleTheme}
+              className="flex-1 p-2 text-slate-600 dark:text-slate-350 bg-slate-500/5 hover:bg-slate-500/10 border border-slate-200/10 rounded-xl transition-all flex items-center justify-center shrink-0"
+              title="Switch Dark/Light Theme"
+            >
+              {theme === 'light' ? (
+                <Moon className="w-4 h-4 text-slate-655" />
+              ) : (
+                <Sun className="w-4 h-4 text-amber-400" />
+              )}
+              <span className="text-[10px] font-bold ml-1">Mode</span>
+            </button>
+
+          </div>
+
+        </div>
+      </aside>
       )}
     </>
   );

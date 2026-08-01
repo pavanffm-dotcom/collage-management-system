@@ -72,3 +72,17 @@ export interface LibraryStats {
   topSearches: { query: string; count: number }[];
   categoryBreakdown: { name: string; count: number }[];
 }
+
+export interface IssuedBook {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  studentId: string;
+  studentName: string;
+  issueDate: string;
+  dueDate: string;
+  returnDate?: string;
+  fineAmount?: number;
+  status: 'Issued' | 'Returned';
+}
+

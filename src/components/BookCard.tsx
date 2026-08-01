@@ -9,7 +9,7 @@ interface BookCardProps {
   onSelectBook: (book: Book, openMap?: boolean) => void;
 }
 
-export const BookCard: React.FC<BookCardProps> = ({ book, aiResult, onSelectBook }) => {
+export const BookCard: React.FC<BookCardProps> = React.memo(({ book, aiResult, onSelectBook }) => {
   const { currentPreset } = useTheme();
   const isAvailable = book.availability === 'Available' && book.availableCopies > 0;
 
@@ -60,6 +60,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, aiResult, onSelectBook
             alt={book.title}
             className={`w-20 h-28 object-cover ${currentPreset.buttonRadius} border border-slate-200 dark:border-slate-800 shadow-sm shrink-0`}
             loading="lazy"
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className={`w-20 h-28 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} flex items-center justify-center text-white shrink-0 shadow-sm`}>
@@ -132,4 +133,4 @@ export const BookCard: React.FC<BookCardProps> = ({ book, aiResult, onSelectBook
 
     </div>
   );
-};
+});

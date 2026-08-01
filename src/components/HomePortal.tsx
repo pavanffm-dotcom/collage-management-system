@@ -55,6 +55,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
   // Detailed Designations for Teachers & Admins
   const [teacherDesignation, setTeacherDesignation] = useState<'HOD' | 'Teacher'>('Teacher');
   const [adminDesignation, setAdminDesignation] = useState<'Lead' | 'Staff'>('Staff');
+  const [libraryDesignation, setLibraryDesignation] = useState<'admin' | 'staff'>('admin');
   
   // Google simulated login UI controls
   const [showGoogleAccounts, setShowGoogleAccounts] = useState(false);
@@ -100,15 +101,16 @@ export const HomePortal: React.FC<HomePortalProps> = ({
     
     // Determine exact role according to designations
     let finalRole: string = selectedRole;
-    if (selectedRole === 'Teacher') {
-      finalRole = teacherDesignation === 'HOD' ? 'HOD' : 'Teacher';
-    } else if (selectedRole === 'Admin') {
-      finalRole = adminDesignation === 'Lead' ? 'Admin' : 'Staff';
-    }
-
-    // Specialize role if they choose Library department to match previous setup
-    if (finalRole === 'Teacher' && chosenDept === 'library') {
-      finalRole = 'Librarian';
+    if (chosenDept === 'library') {
+      if (selectedRole !== 'Student') {
+        finalRole = libraryDesignation === 'admin' ? 'Librarian' : 'Staff';
+      }
+    } else {
+      if (selectedRole === 'Teacher') {
+        finalRole = teacherDesignation === 'HOD' ? 'HOD' : 'Teacher';
+      } else if (selectedRole === 'Admin') {
+        finalRole = adminDesignation === 'Lead' ? 'Admin' : 'Staff';
+      }
     }
 
     onSignInSuccess({
@@ -188,7 +190,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             {/* Elegant pill */}
             <div className={`inline-flex items-center gap-2 px-3 py-1 ${currentPreset.badgeRadius} ${currentPreset.badgeBg} font-extrabold text-xs tracking-wider uppercase border border-indigo-500/10`}>
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span>CMS Portal Active • v2.4.0</span>
+              <span>Multi-Tenant Hub • 10,000+ Colleges</span>
             </div>
 
             <div className="space-y-3">
@@ -196,23 +198,23 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                 Academic Hub & <span className={`${currentPreset.accentText}`}>Unified CMS</span>
               </h1>
               <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-lg leading-relaxed font-medium">
-                A seamless single-sign-on workspace connecting students, faculty, and administrative staff with essential college services. Navigate book catalogs, class sheets, and campus schedules effortlessly.
+                A highly scalable, multi-campus single-sign-on workspace designed to support over 10,000+ colleges. Connect students, faculty, and administrative staff with isolated campus services, predefined subjects, and library catalogs effortlessly.
               </p>
             </div>
 
             {/* Quick stats board to feel complete and professional */}
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className={`${currentPreset.innerCardBg} p-4 ${currentPreset.cardRadius} border ${currentPreset.borderColor} flex flex-col justify-between shadow-sm transition-all hover:scale-[1.01]`}>
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Modules</span>
-                <span className={`text-xl font-black ${currentPreset.accentText} mt-1`}>06 Total</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Predefined Subjects</span>
+                <span className={`text-sm sm:text-base font-black ${currentPreset.accentText} mt-1`}>150+ Available</span>
               </div>
               <div className={`${currentPreset.innerCardBg} p-4 ${currentPreset.cardRadius} border ${currentPreset.borderColor} flex flex-col justify-between shadow-sm transition-all hover:scale-[1.01]`}>
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">SSO Service</span>
-                <span className={`text-xl font-black ${currentPreset.accentText} mt-1`}>Active</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Supported Colleges</span>
+                <span className={`text-sm sm:text-base font-black ${currentPreset.accentText} mt-1`}>10,000+ Active</span>
               </div>
               <div className={`${currentPreset.innerCardBg} p-4 ${currentPreset.cardRadius} border ${currentPreset.borderColor} flex flex-col justify-between shadow-sm transition-all hover:scale-[1.01]`}>
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">System Load</span>
-                <span className={`text-xl font-black ${currentPreset.accentText} mt-1`}>Optimal</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Data Isolation</span>
+                <span className={`text-sm sm:text-base font-black ${currentPreset.accentText} mt-1`}>Secure Core</span>
               </div>
             </div>
           </div>
@@ -232,21 +234,42 @@ export const HomePortal: React.FC<HomePortalProps> = ({
               {departmentsList.map((dept) => {
                 const IconComp = dept.icon;
                 const isLibrary = dept.id === 'library';
+                const isSuperBlack = colorTheme === 'superblack';
+
+                // Icon background styling
+                const iconBgClass = isSuperBlack
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-black border border-zinc-700/80 dark:border-zinc-300'
+                  : `bg-gradient-to-tr ${dept.color} text-white`;
+
+                // Badge text color styling
+                const statusTextColor = isSuperBlack
+                  ? 'text-zinc-900 dark:text-zinc-100 font-mono font-bold'
+                  : isLibrary
+                  ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'text-indigo-600 dark:text-indigo-400 font-bold';
+
+                // Bullet color styling
+                const bulletColor = isSuperBlack
+                  ? 'bg-zinc-900 dark:bg-zinc-100'
+                  : isLibrary
+                  ? 'bg-emerald-500 animate-pulse'
+                  : 'bg-indigo-500/70';
+
                 return (
                   <div
                     key={dept.id}
-                    className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/40 dark:bg-zinc-900/20 border border-slate-200/50 dark:border-zinc-800/30 shadow-xs"
+                    className={`flex items-center gap-3 p-3.5 rounded-2xl ${currentPreset.innerCardBg} border ${currentPreset.borderColor} shadow-xs transition-all hover:scale-[1.01]`}
                   >
-                    <div className={`p-2 rounded-xl bg-gradient-to-tr ${dept.color} text-white shrink-0 shadow-xs`}>
+                    <div className={`p-2 rounded-xl ${iconBgClass} shrink-0 shadow-xs flex items-center justify-center`}>
                       <IconComp className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 space-y-0.5">
-                      <span className="text-xs font-extrabold text-slate-900 dark:text-white truncate block">
+                      <span className="text-xs font-extrabold text-zinc-900 dark:text-white truncate block">
                         {dept.name}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${isLibrary ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500/70'}`} />
-                        <span className={`text-[10px] font-extrabold ${isLibrary ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${bulletColor}`} />
+                        <span className={`text-[10px] ${statusTextColor}`}>
                           {isLibrary ? 'Fully Active' : 'Work in Progress'}
                         </span>
                       </div>
@@ -487,81 +510,130 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                   })}
                 </div>
 
-                {/* Teacher sub-role specification (HOD vs Regular Faculty) */}
-                {selectedRole === 'Teacher' && (
-                  <div className="p-4 bg-purple-500/5 dark:bg-purple-950/10 rounded-2xl border border-purple-500/10 text-left space-y-3 animate-fade-in">
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block uppercase tracking-wider">
-                      Academic Designation:
+                {/* Library sub-role specifications vs general department designations */}
+                {chosenDept === 'library' && selectedRole !== 'Student' ? (
+                  <div className="p-4 bg-emerald-500/5 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/10 text-left space-y-3 animate-fade-in">
+                    <span className="text-xs font-bold text-slate-550 dark:text-slate-400 block uppercase tracking-wider">
+                      Library System Access Tier:
                     </span>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setTeacherDesignation('HOD')}
-                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                          teacherDesignation === 'HOD'
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        onClick={() => setLibraryDesignation('admin')}
+                        className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                          libraryDesignation === 'admin'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                             : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
                         }`}
                       >
-                        <GraduationCap className="w-4 h-4" />
-                        <span>Head of Dept (HOD)</span>
+                        <ShieldCheck className="w-4 h-4 shrink-0" />
+                        <div>
+                          <span className="block leading-none font-extrabold">Admin/Librarian</span>
+                          <span className="text-[9px] opacity-85 block font-medium mt-1">Category 1 & 2 Access</span>
+                        </div>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => setTeacherDesignation('Teacher')}
-                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                          teacherDesignation === 'Teacher'
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        onClick={() => setLibraryDesignation('staff')}
+                        className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                          libraryDesignation === 'staff'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                             : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
                         }`}
                       >
-                        <User className="w-4 h-4" />
-                        <span>Faculty / Teacher</span>
+                        <Users className="w-4 h-4 shrink-0" />
+                        <div>
+                          <span className="block leading-none font-extrabold">Staff/Counter</span>
+                          <span className="text-[9px] opacity-85 block font-medium mt-1">Category 3 & 4 Access</span>
+                        </div>
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400">
-                      {teacherDesignation === 'HOD' 
-                        ? '🛡️ HOD panel provides curriculum schedules, practical syllabus completion grids, and notices board editing.'
-                        : '📝 General faculty manages student roll attendance logging and lab manual updates.'}
+                    <p className="text-[10px] text-slate-400 leading-snug">
+                      {libraryDesignation === 'admin' 
+                        ? '🛡️ Full access: formulate rules, approve book acquisitions, manage INFLIBNET tokens, add catalog metadata, and run NAAC reports.'
+                        : '💼 Desk operations: restricted to Circulation counter desk (issue books, accept returns, calculate overdue fines, student lookup).'}
                     </p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Teacher sub-role specification (HOD vs Regular Faculty) */}
+                    {selectedRole === 'Teacher' && (
+                      <div className="p-4 bg-purple-500/5 dark:bg-purple-950/10 rounded-2xl border border-purple-500/10 text-left space-y-3 animate-fade-in">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block uppercase tracking-wider">
+                          Academic Designation:
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTeacherDesignation('HOD')}
+                            className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                              teacherDesignation === 'HOD'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
+                            }`}
+                          >
+                            <GraduationCap className="w-4 h-4" />
+                            <span>Head of Dept (HOD)</span>
+                          </button>
 
-                {/* Admin sub-role specification */}
-                {selectedRole === 'Admin' && (
-                  <div className="p-4 bg-indigo-500/5 dark:bg-indigo-950/10 rounded-2xl border border-indigo-500/10 text-left space-y-3 animate-fade-in">
-                    <span className="text-xs font-bold text-slate-550 dark:text-slate-400 block uppercase tracking-wider">
-                      Admin Authority Level:
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAdminDesignation('Lead')}
-                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                          adminDesignation === 'Lead'
-                            ? `${currentPreset.buttonBg} border-transparent`
-                            : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
-                        }`}
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>Lead Admin</span>
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => setTeacherDesignation('Teacher')}
+                            className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                              teacherDesignation === 'Teacher'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
+                            }`}
+                          >
+                            <User className="w-4 h-4" />
+                            <span>Faculty / Teacher</span>
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          {teacherDesignation === 'HOD' 
+                            ? '🛡️ HOD panel provides curriculum schedules, practical syllabus completion grids, and notices board editing.'
+                            : '📝 General faculty manages student roll attendance logging and lab manual updates.'}
+                        </p>
+                      </div>
+                    )}
 
-                      <button
-                        type="button"
-                        onClick={() => setAdminDesignation('Staff')}
-                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                          adminDesignation === 'Staff'
-                            ? `${currentPreset.buttonBg} border-transparent`
-                            : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
-                        }`}
-                      >
-                        <Users className="w-4 h-4" />
-                        <span>General Staff</span>
-                      </button>
-                    </div>
-                  </div>
+                    {/* Admin sub-role specification */}
+                    {selectedRole === 'Admin' && (
+                      <div className="p-4 bg-indigo-500/5 dark:bg-indigo-950/10 rounded-2xl border border-indigo-500/10 text-left space-y-3 animate-fade-in">
+                        <span className="text-xs font-bold text-slate-550 dark:text-slate-400 block uppercase tracking-wider">
+                          Admin Authority Level:
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAdminDesignation('Lead')}
+                            className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                              adminDesignation === 'Lead'
+                                ? `${currentPreset.buttonBg} border-transparent`
+                                : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
+                            }`}
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>Lead Admin</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setAdminDesignation('Staff')}
+                            className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                              adminDesignation === 'Staff'
+                                ? `${currentPreset.buttonBg} border-transparent`
+                                : `bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-300 ${currentPreset.borderColor}`
+                            }`}
+                          >
+                            <Users className="w-4 h-4" />
+                            <span>General Staff</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Buttons to navigate back or proceed */}

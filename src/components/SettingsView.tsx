@@ -178,26 +178,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       </div>
 
-      {/* Option 3: Account & Session (Sign Out) */}
+      {/* Option 3: Account & Session (Sign Out / Change Department) */}
       {onLogout && (
-        <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all duration-500`}>
+        <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border border-rose-200/50 dark:border-rose-900/30 shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all duration-500`}>
           <div className="space-y-1">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span>Active Portal Session</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block animate-pulse" />
+              <span className="text-rose-600 dark:text-rose-400">Exit Portal & Switch Department</span>
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              You are currently logged in. Sign out to change departments, switch roles, or manage other profiles.
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xl">
+              You are currently logged into the <span className="font-bold text-indigo-600 dark:text-indigo-400">Library Portal</span>. 
+              Sign out here to return to the Main Portal where you can select other departments, switch user profiles, or test different administrative views.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onLogout}
-            className="py-2.5 px-5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all border border-rose-100 dark:border-rose-900/30 active:scale-95"
+            className="py-3 px-6 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shrink-0"
           >
             <LogOut className="w-4 h-4" />
-            <span>Sign Out from Portal</span>
+            <span>Sign Out & Switch Portal</span>
           </button>
         </div>
       )}

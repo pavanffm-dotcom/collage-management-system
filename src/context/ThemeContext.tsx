@@ -180,28 +180,28 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: 'Super Black OLED',
     emoji: '🖤',
     tagline: 'Pure OLED monochrome pitch black & high-contrast soft rounded square layout',
-    gradientBg: 'from-zinc-900/90 via-black to-zinc-950',
+    gradientBg: 'from-zinc-900 via-black to-zinc-950',
     bannerBg: 'from-black via-zinc-950 to-black border-zinc-800',
-    buttonBg: 'bg-white hover:bg-zinc-200 text-black font-extrabold shadow-lg shadow-white/10',
-    accentText: 'text-zinc-900 dark:text-white font-mono',
-    badgeBg: 'bg-black dark:bg-white text-white dark:text-black border border-zinc-700 dark:border-white font-mono font-bold',
+    buttonBg: 'bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-extrabold shadow-md shadow-black/10 dark:shadow-white/10',
+    accentText: 'text-zinc-950 dark:text-white font-mono font-black',
+    badgeBg: 'bg-zinc-900 text-white dark:bg-white dark:text-black border border-zinc-800 dark:border-zinc-200 font-mono font-bold',
     borderColor: 'border-zinc-300 dark:border-zinc-800',
     previewColors: ['#000000', '#27272a', '#ffffff'],
     pageBg: 'bg-zinc-100 dark:bg-black',
-    cardBg: 'bg-white/80 dark:bg-[#080808]/75 backdrop-blur-md',
+    cardBg: 'bg-white dark:bg-[#080808] backdrop-blur-md',
     cardBorder: 'border border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600',
-    innerCardBg: 'bg-zinc-100/50 dark:bg-[#111111]/50 backdrop-blur-xs',
-    headerBg: 'bg-white/80 dark:bg-black/70 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800/60',
-    heroCardBg: 'bg-white/60 dark:bg-[#0a0a0a]/60 backdrop-blur-xl text-slate-900 dark:text-white border border-zinc-200 dark:border-zinc-800/80 shadow-2xl shadow-white/5',
-    inputBg: 'bg-white/50 dark:bg-[#0d0d0d]/40 backdrop-blur-md border border-zinc-300 dark:border-zinc-800 text-black dark:text-white placeholder-zinc-500 font-mono',
-    secondaryButtonBg: 'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-black dark:text-white border border-zinc-300 dark:border-zinc-800 font-bold',
-    modalBg: 'bg-white dark:bg-[#0a0a0a] border border-zinc-300 dark:border-zinc-800',
+    innerCardBg: 'bg-zinc-100/80 dark:bg-[#121212] backdrop-blur-xs',
+    headerBg: 'bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800',
+    heroCardBg: 'bg-white dark:bg-[#0d0d0d] text-zinc-950 dark:text-white border border-zinc-300 dark:border-zinc-800 shadow-2xl shadow-black/5 dark:shadow-black/80',
+    inputBg: 'bg-zinc-50 dark:bg-[#121212] border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 font-mono',
+    secondaryButtonBg: 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 font-bold',
+    modalBg: 'bg-white dark:bg-[#0c0c0c] border border-zinc-300 dark:border-zinc-800',
     glowShadow: 'shadow-2xl shadow-white/5',
     cardRadius: 'rounded-2xl',
     buttonRadius: 'rounded-xl',
     inputRadius: 'rounded-xl',
     badgeRadius: 'rounded-lg',
-    cardExtraClass: 'border border-zinc-200 dark:border-zinc-800/80 shadow-xl shadow-black/10 dark:shadow-black/60'
+    cardExtraClass: 'border border-zinc-300 dark:border-zinc-800 shadow-xl shadow-black/5 dark:shadow-black/80'
   },
   {
     id: 'glass',
@@ -279,7 +279,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [colorTheme, setColorThemeState] = useState<ColorTheme>(() => {
     const saved = localStorage.getItem('library_color_theme');
-    return (saved as ColorTheme) || 'lavender';
+    return (saved as ColorTheme) || 'superblack';
   });
 
   useEffect(() => {
