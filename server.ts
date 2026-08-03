@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { INITIAL_BOOKS } from './src/data/initialBooks.js';
 import { Book, AISearchResponse, AISearchResult, College } from './src/types.js';
@@ -8,6 +9,22 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+const DATA_DIR = path.join(process.cwd(), '.data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const DATA_FILE = path.join(DATA_DIR, 'library_data_store.json');
+const OLD_DATA_FILE = path.join(process.cwd(), 'library_data_store.json');
+
+if (!fs.existsSync(DATA_FILE) && fs.existsSync(OLD_DATA_FILE)) {
+  try {
+    fs.copyFileSync(OLD_DATA_FILE, DATA_FILE);
+    fs.unlinkSync(OLD_DATA_FILE);
+  } catch (e) {
+    console.error('Data file migration error:', e);
+  }
+}
 
 // Initial Seed Colleges for Multi-Tenancy
 let collegesList: College[] = [
@@ -61,6 +78,32 @@ let booksCatalog: Book[] = INITIAL_BOOKS.map(b => ({
   ...b,
   collegeId: b.collegeId || 'col-gec-goa'
 }));
+
+// Load persisted library data from disk if exists
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    const rawData = fs.readFileSync(DATA_FILE, 'utf-8');
+    const parsed = JSON.parse(rawData);
+    if (parsed.colleges && Array.isArray(parsed.colleges)) {
+      collegesList = parsed.colleges;
+    }
+    if (parsed.books && Array.isArray(parsed.books)) {
+      booksCatalog = parsed.books;
+    }
+  } catch (err) {
+    console.error('Error loading library_data_store.json:', err);
+  }
+}
+
+function saveData() {
+  try {
+    const tempFile = DATA_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify({ colleges: collegesList, books: booksCatalog }, null, 2));
+    fs.renameSync(tempFile, DATA_FILE);
+  } catch (err) {
+    console.error('Error saving library_data_store.json:', err);
+  }
+}
 
 // Analytics & Search Logs (Scoped by college)
 const searchLogs: { query: string; type: 'ai' | 'exact'; timestamp: string; resultsCount: number; collegeId: string }[] = [];
@@ -276,6 +319,7 @@ app.put('/api/colleges/:id', (req, res) => {
   };
 
   collegesList[colIndex] = updatedCollege;
+  saveData();
   res.json({ success: true, college: updatedCollege });
 });
 
@@ -320,6 +364,7 @@ app.post('/api/auth/register', (req, res) => {
     accessionNumber: `${code}-2026-00${i + 1}`
   }));
   booksCatalog.push(...seedBooks);
+  saveData();
 
   res.status(201).json({
     success: true,
@@ -395,6 +440,7 @@ app.post('/api/books', (req, res) => {
   };
 
   booksCatalog.unshift(newBook);
+  saveData();
   res.status(201).json({ book: newBook, message: 'Book added successfully' });
 });
 
@@ -511,7 +557,8 @@ app.post('/api/books/bulk', (req, res) => {
           shelfCode,
           sectionName: `${b.department || 'General'} Section`
         },
-        customAttributes: b.customAttributes || undefined,
+        customAttributes: b.customAttributes || b.rawCsvData || b,
+        rawCsvData: b.rawCsvData || b.customAttributes || b,
         dateAdded: dateStr,
         lastUpdated: dateStr
       };
@@ -521,6 +568,8 @@ app.post('/api/books/bulk', (req, res) => {
       processedBooks.push(newBook);
     }
   }
+
+  saveData();
 
   res.status(201).json({
     success: true,
@@ -563,6 +612,7 @@ app.put('/api/books/:id', (req, res) => {
   };
 
   booksCatalog[index] = updatedBook;
+  saveData();
   res.json({ book: updatedBook, message: 'Book updated successfully' });
 });
 
@@ -570,10 +620,21 @@ app.put('/api/books/:id', (req, res) => {
 app.delete('/api/books/:id', (req, res) => {
   const initialLength = booksCatalog.length;
   booksCatalog = booksCatalog.filter(b => b.id !== req.params.id);
+  saveData();
   if (booksCatalog.length === initialLength) {
     return res.status(404).json({ error: 'Book not found' });
   }
   res.json({ success: true, message: 'Book removed from library catalog' });
+});
+
+// DELETE /api/books/college/:collegeId/clear - Clear all books for a college (Delete Full Sheet)
+app.delete('/api/books/college/:collegeId/clear', (req, res) => {
+  const targetCollegeId = req.params.collegeId;
+  const beforeCount = booksCatalog.length;
+  booksCatalog = booksCatalog.filter(b => b.collegeId !== targetCollegeId);
+  console.log(`Clearing catalog for college ${targetCollegeId}. Removed ${beforeCount - booksCatalog.length} books.`);
+  saveData();
+  res.json({ success: true, message: 'All books cleared for college catalog' });
 });
 
 // POST /api/search/exact - Title/Author/ISBN/Subject search

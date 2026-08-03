@@ -4,6 +4,7 @@ import {
   BookOpen, 
   BarChart2, 
   QrCode, 
+  Barcode,
   Settings, 
   Sun, 
   Moon, 
@@ -19,7 +20,8 @@ import {
   ChevronDown,
   User,
   Palette,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { College } from '../types';
@@ -30,6 +32,8 @@ interface HeaderProps {
   onOpenAuthModal: () => void;
   onLogout: () => void;
   onOpenQRModal: () => void;
+  onOpenBarcodeModal?: () => void;
+  onCloseQRModal?: () => void;
   activeView: 'public' | 'admin';
   setActiveView: (view: 'public' | 'admin') => void;
   adminTab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory';
@@ -39,6 +43,7 @@ interface HeaderProps {
   selectedDept?: string;
   onSelectDept?: (deptId: string) => void;
   onOpenThemeModal?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,13 +52,16 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuthModal,
   onLogout,
   onOpenQRModal,
+  onOpenBarcodeModal,
+  onCloseQRModal,
   activeView,
   setActiveView,
   adminTab,
   setAdminTab,
   selectedDept,
   onSelectDept,
-  onOpenThemeModal
+  onOpenThemeModal,
+  onOpenInstallModal
 }) => {
   const { theme, toggleTheme, currentPreset } = useTheme();
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
@@ -75,6 +83,9 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveView(targetView);
     if (tab) {
       setAdminTab(tab);
+    }
+    if (onCloseQRModal) {
+      onCloseQRModal();
     }
   };
 
@@ -209,6 +220,19 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* Install App (PWA) Button */}
+            {onOpenInstallModal && (
+              <button
+                type="button"
+                onClick={onOpenInstallModal}
+                className="px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 active:scale-95 border border-indigo-400/30 shrink-0"
+                title="Install Application on Phone or PC"
+              >
+                <Download className="w-3.5 h-3.5 animate-bounce" />
+                <span className="hidden xs:inline sm:inline">Install</span>
+              </button>
+            )}
+
             {/* Theme Customizer Button */}
             {onOpenThemeModal && (
               <button
@@ -236,102 +260,66 @@ export const Header: React.FC<HeaderProps> = ({
 
         </div>
 
-        {/* Mobile & Tablet Horizontal Tab Switcher Sub-Navigation (Highly compact & styled) */}
-        {authUser && selectedDept === 'library' && (
-          <div className="lg:hidden border-t border-slate-200/40 dark:border-zinc-800/40 px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-            <button
-              onClick={() => handleTabClick('public')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                activeView === 'public'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Student Find</span>
-            </button>
-
-            {/* Circulation Counter Tab */}
-            <button
-              onClick={() => handleTabClick('admin', 'circulation')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                activeView === 'admin' && adminTab === 'circulation'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-              }`}
-            >
-              <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
-              <span>Circulation</span>
-            </button>
-
-            {/* Cataloging & Add Books Tab (Librarian/Admin only) */}
-            {authUser.role !== 'Staff' && (
-              <button
-                onClick={() => handleTabClick('admin', 'add')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                  activeView === 'admin' && adminTab === 'add'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-                }`}
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>Add Books</span>
-              </button>
-            )}
-
-            {/* Analytics Tab (Librarian/Admin only) */}
-            {authUser.role !== 'Staff' && (
-              <button
-                onClick={() => handleTabClick('admin', 'analytics')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                  activeView === 'admin' && adminTab === 'analytics'
-                    ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-                }`}
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>Analytics</span>
-              </button>
-            )}
-
-            {/* Library Directory Tab */}
-            <button
-              onClick={() => handleTabClick('admin', 'directory')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                activeView === 'admin' && adminTab === 'directory'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Directory</span>
-            </button>
-
-            {/* Settings Tab (Librarian/Admin only) */}
-            {authUser.role !== 'Staff' && (
-              <button
-                onClick={() => handleTabClick('admin', 'settings')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none ${
-                  activeView === 'admin' && adminTab === 'settings'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Settings</span>
-              </button>
-            )}
-
-            <button
-              onClick={onOpenQRModal}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all shrink-0 select-none text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800/45"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Entrance QR</span>
-            </button>
-          </div>
-        )}
       </header>
+
+      {/* YouTube-Style Fixed Mobile Bottom Navigation Bar */}
+      {selectedDept === 'library' && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[60] bg-slate-900/95 dark:bg-zinc-950/95 border-t border-slate-800/80 dark:border-zinc-800/80 backdrop-blur-xl px-2 py-1.5 shadow-2xl flex items-center justify-around select-none">
+          {/* 1. Find Button (Student Find -> Find) */}
+          <button
+            type="button"
+            onClick={() => handleTabClick('public')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
+              activeView === 'public'
+                ? 'text-indigo-400 font-extrabold scale-105'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Search className={`w-5 h-5 mb-0.5 ${activeView === 'public' ? 'text-indigo-400 stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] tracking-tight font-bold">Find</span>
+          </button>
+
+          {/* 2. Add Book Button */}
+          <button
+            type="button"
+            onClick={() => handleTabClick('admin', 'add')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
+              activeView === 'admin' && adminTab === 'add'
+                ? 'text-emerald-400 font-extrabold scale-105'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <PlusCircle className={`w-5 h-5 mb-0.5 ${activeView === 'admin' && adminTab === 'add' ? 'text-emerald-400 stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] tracking-tight font-bold">Add Book</span>
+          </button>
+
+          {/* 3. QR / Barcode Button (Direct Camera Scanner) */}
+          <button
+            type="button"
+            onClick={onOpenBarcodeModal || onOpenQRModal}
+            className="flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all active:scale-95 group"
+          >
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center -mt-2 shadow-lg shadow-amber-500/10 group-hover:scale-110 transition-transform">
+              <Barcode className="w-4.5 h-4.5 text-amber-400" />
+            </div>
+            <span className="text-[10px] tracking-tight font-extrabold text-amber-400 mt-0.5">QR</span>
+          </button>
+
+          {/* 4. Settings Button */}
+          <button
+            type="button"
+            onClick={() => handleTabClick('admin', 'settings')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
+              activeView === 'admin' && adminTab === 'settings'
+                ? 'text-purple-400 font-extrabold scale-105'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Settings className={`w-5 h-5 mb-0.5 ${activeView === 'admin' && adminTab === 'settings' ? 'text-purple-400 stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] tracking-tight font-bold">Settings</span>
+          </button>
+        </nav>
+      )}
 
       {/* Persistent Left Sidebar (Visible only on Desktop - lg: screens) */}
       {authUser && (
@@ -501,6 +489,14 @@ export const Header: React.FC<HeaderProps> = ({
                   <QrCode className="w-4 h-4 text-emerald-500" />
                   <span>Entrance QR</span>
                 </button>
+
+                <button
+                  onClick={onOpenBarcodeModal || onOpenQRModal}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/40 dark:border-indigo-800/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                >
+                  <Barcode className="w-4 h-4 text-indigo-500" />
+                  <span>Barcode & Shelf Scanner</span>
+                </button>
               </div>
             </div>
           )}
@@ -543,6 +539,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <LogIn className="w-4 h-4" />
               <span>Librarian Login</span>
+            </button>
+          )}
+
+          {/* Install App (PWA) Button for Desktop Sidebar */}
+          {onOpenInstallModal && (
+            <button
+              type="button"
+              onClick={onOpenInstallModal}
+              className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 border border-indigo-400/30"
+              title="Install App on Phone or PC"
+            >
+              <Download className="w-4 h-4 animate-bounce" />
+              <span>Install App (PWA)</span>
             </button>
           )}
 

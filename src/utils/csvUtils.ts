@@ -207,20 +207,20 @@ export interface StandardBookField {
 }
 
 export const TARGET_BOOK_FIELDS: StandardBookField[] = [
-  { id: 'title', label: 'Book Title', required: true, keywords: ['title', 'booktitle', 'book_title', 'bookname', 'book_name', 'name', 'nama'] },
-  { id: 'author', label: 'Author(s)', required: true, keywords: ['author', 'writer', 'by', 'author_name', 'writtenby', 'pengarang', 'creator'] },
-  { id: 'accessionNumber', label: 'Accession / Register No', keywords: ['accession', 'accessionno', 'accession_number', 'acc_no', 'accno', 'register_no', 'asset_id'] },
+  { id: 'title', label: 'Book Title', required: true, keywords: ['title', 'booktitle', 'book_title', 'bookname', 'book_name', 'name', 'nama', 'item'] },
+  { id: 'author', label: 'Author(s)', required: true, keywords: ['author', 'contributor', 'contributors', 'writer', 'by', 'author_name', 'writtenby', 'pengarang', 'creator', 'person', 'editor'] },
+  { id: 'accessionNumber', label: 'Accession / Register No', keywords: ['accession', 'accessionno', 'accession_number', 'acc_no', 'accno', 'register_no', 'asset_id', 'otlid', 'otl_id', 'id', 'book_id'] },
   { id: 'isbn', label: 'ISBN / Barcode', keywords: ['isbn', 'isbn10', 'isbn13', 'standard_no', 'barcode', 'code'] },
-  { id: 'department', label: 'Department / Branch', keywords: ['department', 'dept', 'branch', 'stream', 'discipline', 'faculty'] },
-  { id: 'subject', label: 'Subject / Course', keywords: ['subject', 'topic', 'course', 'discipline'] },
+  { id: 'department', label: 'Department / Branch', keywords: ['department', 'dept', 'branch', 'stream', 'discipline', 'faculty', 'subject1', 'subject_1', 'category', 'collection'] },
+  { id: 'subject', label: 'Subject / Course', keywords: ['subject', 'topic', 'course', 'discipline', 'subject2', 'subject_2', 'type1', 'type_1', 'subtopic'] },
   { id: 'almari', label: 'Almari / Rack / Building', keywords: ['almari', 'rack', 'cupboard', 'cabinet', 'block', 'shelf_id', 'storage', 'location', 'rack_no'] },
   { id: 'row', label: 'Row / Tier / Floor', keywords: ['row', 'tier', 'shelfrow', 'row_no', 'level', 'floor'] },
   { id: 'position', label: 'Shelf Position (Top/Mid/Bot)', keywords: ['position', 'level', 'pos', 'shelf_position'] },
   { id: 'copies', label: 'Copies / Quantity', keywords: ['copies', 'qty', 'quantity', 'total_copies', 'stock', 'total', 'count'] },
   { id: 'publisher', label: 'Publisher', keywords: ['publisher', 'press', 'publishing_house', 'vendor'] },
   { id: 'callNumber', label: 'Call Number / DDC', keywords: ['call', 'callno', 'ddc', 'classification', 'call_code'] },
-  { id: 'publicationYear', label: 'Publication Year', keywords: ['year', 'pub_year', 'publication_year', 'publishing_year'] },
-  { id: 'description', label: 'Description / Notes', keywords: ['description', 'desc', 'summary', 'details', 'remarks', 'about'] }
+  { id: 'publicationYear', label: 'Publication Year', keywords: ['copyright_year', 'copyrightyear', 'copyright', 'year', 'pub_year', 'publication_year', 'publishing_year'] },
+  { id: 'description', label: 'Description / Notes', keywords: ['description', 'desc', 'summary', 'details', 'remarks', 'about', 'descriptivelicense', 'license'] }
 ];
 
 /**
@@ -235,7 +235,7 @@ export function autoDetectColumnMapping(headers: string[]): Record<string, strin
     const match = headers.find(h => {
       if (usedHeaders.has(h)) return false;
       const normalizedHeader = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return field.keywords.some(k => normalizedHeader.includes(k));
+      return field.keywords.some(k => normalizedHeader.includes(k) || k.includes(normalizedHeader));
     });
 
     if (match) {
@@ -250,66 +250,63 @@ export function autoDetectColumnMapping(headers: string[]): Record<string, strin
 }
 
 /**
+ * Converts raw dataset rows to structured Book objects preserving ALL exact CSV columns
+ * as-is without injecting dummy default strings (e.g. Academic Press, 000.00 REF, etc.).
+ */
+export function convertExactRawRowsToBooks(rows: Record<string, string>[]): any[] {
+  return rows.map((row, idx) => {
+    const rawCsvData = { ...row };
+    const customAttributes = { ...row };
+
+    // Identify candidate title and author keys from row without forcing hardcoded mappings
+    const titleKey = Object.keys(row).find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('title') || norm.includes('book') || norm.includes('item') || norm === 'name';
+    }) || Object.keys(row)[0];
+
+    const authorKey = Object.keys(row).find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('author') || norm.includes('contributor') || norm.includes('writer') || norm.includes('creator');
+    }) || Object.keys(row)[1];
+
+    const title = (titleKey && row[titleKey] && row[titleKey].trim()) 
+      ? row[titleKey].trim() 
+      : (Object.values(row).find(v => v && v.trim().length > 0) || `Record #${idx + 1}`);
+
+    const author = (authorKey && row[authorKey] && row[authorKey].trim()) 
+      ? row[authorKey].trim() 
+      : '';
+
+    return {
+      id: `book-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+      title,
+      author,
+      accessionNumber: row['Accession Number'] || row['Accession No'] || row['Accession / Register No'] || row['Otl id'] || row['OTL ID'] || row['otl_id'] || row['id'] || `ACC-${idx + 1001}`,
+      isbn: row['ISBN'] || row['Isbn'] || row['Barcode'] || '',
+      department: row['Department'] || row['Branch'] || row['Subject'] || '',
+      subject: row['Subject'] || row['Department'] || '',
+      almari: row['Almari'] || row['Rack'] || '',
+      row: row['Row'] || '',
+      position: row['Position'] || '',
+      copies: 1,
+      totalCopies: 1,
+      availableCopies: 1,
+      publisher: row['Publisher'] || row['Press'] || '',
+      callNumber: row['Call Number'] || row['CallNumber'] || '',
+      description: row['Description'] || row['Notes'] || '',
+      publicationYear: Number(row['Publication Year'] || row['Copyright Year'] || row['Year']) || new Date().getFullYear(),
+      customAttributes,
+      rawCsvData
+    };
+  });
+}
+
+/**
  * Converts raw dataset rows to structured Book objects using user's custom column mapping.
  * Unmapped CSV columns are safely preserved in customAttributes!
  */
-export function convertRawRowsToBooks(rows: Record<string, string>[], mapping: Record<string, string>): any[] {
-  const mappedCsvHeaders = new Set(Object.values(mapping).filter(Boolean));
-
-  return rows.map((row, idx) => {
-    const getVal = (fieldId: string): string => {
-      const headerName = mapping[fieldId];
-      return headerName && row[headerName] ? row[headerName].trim() : '';
-    };
-
-    const title = getVal('title') || 'Untitled Book';
-    const author = getVal('author') || 'Unknown Author';
-    const accessionNumber = getVal('accessionNumber') || `LIB-${new Date().getFullYear()}-${Math.floor(1000 + idx * 7 + Math.random() * 900)}`;
-    const isbn = getVal('isbn') || `978-0-${Math.floor(100000000 + Math.random() * 900000000)}`;
-    const department = getVal('department') || 'General Collection';
-    const subject = getVal('subject') || department;
-    const almari = getVal('almari') || 'A1';
-    const rowNum = getVal('row') || 'R1';
-
-    let position = 'Middle';
-    const posVal = getVal('position').toLowerCase();
-    if (posVal.includes('top')) position = 'Top';
-    else if (posVal.includes('bottom')) position = 'Bottom';
-
-    const rawCopies = getVal('copies');
-    const copies = (rawCopies && !isNaN(Number(rawCopies))) ? Math.max(1, parseInt(rawCopies, 10)) : 1;
-
-    const publisher = getVal('publisher') || 'Academic Press';
-    const callNumber = getVal('callNumber') || '000.00 REF';
-    const description = getVal('description') || `${title} by ${author}`;
-    const pubYear = Number(getVal('publicationYear')) || new Date().getFullYear();
-
-    // Preserve any unmapped extra CSV columns into customAttributes
-    const customAttributes: Record<string, string> = {};
-    Object.keys(row).forEach(header => {
-      if (!mappedCsvHeaders.has(header) && row[header]) {
-        customAttributes[header] = row[header];
-      }
-    });
-
-    return {
-      title,
-      author,
-      accessionNumber,
-      isbn,
-      department,
-      subject,
-      almari,
-      row: rowNum,
-      position,
-      copies,
-      publisher,
-      callNumber,
-      description,
-      publicationYear: pubYear,
-      customAttributes: Object.keys(customAttributes).length > 0 ? customAttributes : undefined
-    };
-  });
+export function convertRawRowsToBooks(rows: Record<string, string>[], mapping?: Record<string, string>): any[] {
+  return convertExactRawRowsToBooks(rows);
 }
 
 /**
@@ -317,6 +314,5 @@ export function convertRawRowsToBooks(rows: Record<string, string>[], mapping: R
  */
 export function parseCSVToBooks(rawText: string): any[] {
   const { headers, rows } = parseCSVToRawDataset(rawText);
-  const mapping = autoDetectColumnMapping(headers);
-  return convertRawRowsToBooks(rows, mapping);
+  return convertExactRawRowsToBooks(rows);
 }

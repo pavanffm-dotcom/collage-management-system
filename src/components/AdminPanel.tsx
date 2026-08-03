@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit2, Trash2, Sparkles, RefreshCw, CheckCircle2, X, Search, BarChart2, QrCode, Settings, BookOpen, Building2, Printer, Copy, Check, FileSpreadsheet, Upload, Download, Users, ArrowLeftRight, Clock, HelpCircle, Coins, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Shield, Plus, Edit2, Trash2, Sparkles, RefreshCw, CheckCircle2, X, Search, BarChart2, QrCode, Settings, BookOpen, Building2, Printer, Copy, Check, FileSpreadsheet, Upload, Download, Users, ArrowLeftRight, Clock, HelpCircle, Coins, User, Sliders, RotateCcw, Layers, FileCode, Table, LayoutGrid, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Minimize2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Book, College, LibraryStats, IssuedBook } from '../types';
 import { AnalyticsView } from './AnalyticsView';
 import { SettingsView } from './SettingsView';
 import { BulkImportModal } from './BulkImportModal';
 import { LibraryStaffDirectory } from './LibraryStaffDirectory';
 import { CuteQRCodeSVG } from './CuteQRCodeSVG';
-import { exportBooksToCSV, downloadSampleTemplateCSV } from '../utils/csvUtils';
+import { exportBooksToCSV, downloadSampleTemplateCSV, parseCSVToRawDataset } from '../utils/csvUtils';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -26,6 +26,9 @@ interface AdminPanelProps {
   setActiveTab?: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => void;
   onLogout?: () => void;
   authUser?: any;
+  onOpenQRModal?: () => void;
+  onOpenBarcodeModal?: () => void;
+  onClearCatalog?: () => Promise<void>;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -43,7 +46,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   activeTab: propActiveTab,
   setActiveTab: propSetActiveTab,
   onLogout,
-  authUser
+  authUser,
+  onOpenQRModal,
+  onOpenBarcodeModal,
+  onClearCatalog
 }) => {
   const { currentPreset } = useTheme();
   const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
@@ -165,12 +171,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     if (fine > 0) {
-      const delayDays = Math.max(1, Math.ceil((today.getTime() - dueDateObj.getTime()) / (1000 * 3600 * 24)));
-      const confirmPaid = window.confirm(`Overdue Alert!\nThis book is late by ${delayDays} days.\nLate fine is Rs. ${fine}.00 (charged at Rs. 2/day).\n\nMark as paid and accept book return?`);
-      if (!confirmPaid) return;
+      setToast({ type: 'info', message: `Book returned! Overdue fine of Rs. ${fine}.00 recorded.` });
     } else {
-      const confirmNormal = window.confirm(`Confirm return of '${issueRecord.bookTitle}'?`);
-      if (!confirmNormal) return;
+      setToast({ type: 'success', message: `Book '${issueRecord.bookTitle}' returned successfully!` });
     }
 
     setIssuedBooks(prev => prev.map(iss => {
@@ -198,6 +201,204 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // --- End Library Circulation ---
 
+  const [showSchemaInfoModal, setShowSchemaInfoModal] = useState(false);
+
+  // Dynamic Schema & Custom CSV Columns State
+  const schemaFileInputRef = useRef<HTMLInputElement>(null);
+  const [detectedCustomSchema, setDetectedCustomSchema] = useState<string[] | null>(() => {
+    const saved = localStorage.getItem('library_detected_form_schema');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Dynamic values store for detected fields
+  const [dynamicFormValues, setDynamicFormValues] = useState<Record<string, string>>({});
+
+  // Form Panel Toggle State & Table Horizontal Scroll Controls
+  const [isAddBookPanelOpen, setIsAddBookPanelOpen] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [showClearSheetModal, setShowClearSheetModal] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    if (tableScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -450 : 450;
+      tableScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // Table View Mode: 'sheet' (Exact Spreadsheet Columns Grid) vs 'standard' (Compact Card Catalog)
+  const [tableViewMode, setTableViewMode] = useState<'sheet' | 'standard'>('sheet');
+
+  const getActiveTableColumns = (): string[] => {
+    if (detectedCustomSchema && detectedCustomSchema.length > 0) {
+      return detectedCustomSchema;
+    }
+
+    const keysInOrder: string[] = [];
+    const keysSeen = new Set<string>();
+
+    books.forEach(b => {
+      const rowData = b.rawCsvData || b.customAttributes;
+      if (rowData) {
+        Object.keys(rowData).forEach(k => {
+          if (!keysSeen.has(k)) {
+            keysSeen.add(k);
+            keysInOrder.push(k);
+          }
+        });
+      }
+    });
+
+    if (keysInOrder.length > 0) {
+      return keysInOrder;
+    }
+
+    return [
+      'Accession / Register No',
+      'Book Title',
+      'Author(s)',
+      'Department / Branch',
+      'Subject',
+      'Publisher',
+      'Publication Year',
+      'ISBN / Barcode',
+      'Description / Notes'
+    ];
+  };
+
+  const getCellValue = (book: Book, colHeader: string): string => {
+    if (!book) return '-';
+
+    // 1. Direct exact key check in rawCsvData
+    if (book.rawCsvData && colHeader in book.rawCsvData) {
+      const val = book.rawCsvData[colHeader];
+      return val !== null && val !== undefined && val !== '' ? String(val) : '-';
+    }
+
+    // 2. Direct exact key check in customAttributes
+    if (book.customAttributes && colHeader in book.customAttributes) {
+      const val = book.customAttributes[colHeader];
+      return val !== null && val !== undefined && val !== '' ? String(val) : '-';
+    }
+
+    // 3. Case-insensitive key check in rawCsvData
+    if (book.rawCsvData) {
+      const norm = colHeader.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matchingKey = Object.keys(book.rawCsvData).find(
+        k => k.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === norm
+      );
+      if (matchingKey) {
+        const val = book.rawCsvData[matchingKey];
+        return val !== null && val !== undefined && val !== '' ? String(val) : '-';
+      }
+    }
+
+    // 4. Case-insensitive key check in customAttributes
+    if (book.customAttributes) {
+      const norm = colHeader.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matchingKey = Object.keys(book.customAttributes).find(
+        k => k.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === norm
+      );
+      if (matchingKey) {
+        const val = book.customAttributes[matchingKey];
+        return val !== null && val !== undefined && val !== '' ? String(val) : '-';
+      }
+    }
+
+    // 5. Fallback for manually added structured books (when no rawCsvData exists)
+    const norm = colHeader.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (norm.includes('title') || norm.includes('booktitle') || norm.includes('bookname') || norm.includes('item') || norm === 'name') {
+      return book.title || '-';
+    }
+    if (norm.includes('author') || norm.includes('contributor') || norm.includes('writer') || norm.includes('creator') || norm.includes('by') || norm === 'pengarang') {
+      return book.author || '-';
+    }
+    if (norm.includes('otlid') || norm.includes('accession') || norm.includes('acc') || norm.includes('register') || norm.includes('asset') || norm === 'id') {
+      return book.accessionNumber || '-';
+    }
+    if (norm.includes('isbn') || norm.includes('barcode') || norm.includes('code')) {
+      return book.isbn || '-';
+    }
+    if (norm.includes('publisher') || norm.includes('press')) {
+      return book.publisher || '-';
+    }
+    if (norm.includes('year') || norm.includes('copyright') || norm.includes('pubyear')) {
+      return book.publicationYear ? String(book.publicationYear) : '-';
+    }
+    if (norm.includes('dept') || norm.includes('department') || norm.includes('branch') || norm.includes('faculty') || norm.includes('subject1') || norm.includes('category')) {
+      return book.department || '-';
+    }
+    if (norm.includes('subject') || norm.includes('course') || norm.includes('topic') || norm.includes('subject2') || norm.includes('type1')) {
+      return book.subject || book.department || '-';
+    }
+    if (norm.includes('location') || norm.includes('almari') || norm.includes('shelf') || norm.includes('rack') || norm.includes('row')) {
+      return `${book.location?.almariNumber || ''} - ${book.location?.rowNumber || ''}`;
+    }
+    if (norm.includes('copies') || norm.includes('quantity')) {
+      return `${book.availableCopies ?? 1}/${book.totalCopies ?? 1}`;
+    }
+    if (norm.includes('desc') || norm.includes('summary') || norm.includes('license') || norm.includes('remark') || norm.includes('about')) {
+      return book.description || book.summary || '-';
+    }
+
+    const directVal = (book as any)[colHeader];
+    if (directVal !== undefined && directVal !== null && directVal !== '') {
+      return String(directVal);
+    }
+
+    return '-';
+  };
+
+  const handleSchemaDetected = (headers: string[]) => {
+    if (!headers || headers.length === 0) return;
+    setDetectedCustomSchema(headers);
+    localStorage.setItem('library_detected_form_schema', JSON.stringify(headers));
+  };
+
+  const handleAutoDetectSchemaFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const { headers } = parseCSVToRawDataset(text);
+        if (headers && headers.length > 0) {
+          handleSchemaDetected(headers);
+          alert(`Auto-detected ${headers.length} columns from file!\nAdd/Edit form buttons and fields have been replaced with columns: ${headers.join(', ')}`);
+        }
+      } catch (err: any) {
+        alert('Could not detect CSV columns: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleResetFormSchema = () => {
+    setDetectedCustomSchema(null);
+    localStorage.removeItem('library_detected_form_schema');
+    setDynamicFormValues({});
+  };
+
   // New Book Form State
   const [formTitle, setFormTitle] = useState('');
   const [formSubtitle, setFormSubtitle] = useState('');
@@ -212,7 +413,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [formCallNumber, setFormCallNumber] = useState('');
   const [formAlmari, setFormAlmari] = useState('A1');
   const [formRow, setFormRow] = useState('R1');
-  const [formPosition, setFormPosition] = useState<'Top' | 'Middle' | 'Bottom'>('Middle');
+  const [formPosition, setFormPosition] = useState<any>('MIDDLE');
   const [formCopies, setFormCopies] = useState(5);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -260,29 +461,80 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSaveBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle || !formAuthor) return;
+
+    let title = formTitle;
+    let author = formAuthor;
+    let dept = formDepartment;
+    let subject = formSubject;
+    let almari = formAlmari;
+    let row = formRow;
+    let position = formPosition;
+    let publisher = formPublisher;
+    let isbn = formIsbn;
+    let callNum = formCallNumber;
+    let copies = formCopies;
+    let customAttrs: Record<string, string> = {};
+
+    if (detectedCustomSchema && detectedCustomSchema.length > 0) {
+      detectedCustomSchema.forEach(colHeader => {
+        const val = dynamicFormValues[colHeader] || '';
+        const norm = colHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        if (norm.includes('title') || norm.includes('book') || norm.includes('name')) {
+          if (val) title = val;
+        } else if (norm.includes('author') || norm.includes('writer') || norm.includes('by')) {
+          if (val) author = val;
+        } else if (norm.includes('dept') || norm.includes('department') || norm.includes('branch')) {
+          if (val) dept = val;
+        } else if (norm.includes('subject') || norm.includes('topic')) {
+          if (val) subject = val;
+        } else if (norm.includes('almari') || norm.includes('rack') || norm.includes('cupboard') || norm.includes('shelfid')) {
+          if (val) almari = val;
+        } else if (norm.includes('row')) {
+          if (val) row = val;
+        } else if (norm.includes('pos') || norm.includes('section') || norm.includes('level')) {
+          if (val) position = val as any;
+        } else if (norm.includes('publisher') || norm.includes('press')) {
+          if (val) publisher = val;
+        } else if (norm.includes('isbn') || norm.includes('barcode')) {
+          if (val) isbn = val;
+        } else if (norm.includes('call') || norm.includes('ddc')) {
+          if (val) callNum = val;
+        } else if (norm.includes('copies') || norm.includes('qty')) {
+          if (val && !isNaN(Number(val))) copies = Number(val);
+        } else {
+          if (val) customAttrs[colHeader] = val;
+        }
+      });
+    }
+
+    if (!title) {
+      alert('Book Title is required.');
+      return;
+    }
 
     const bookPayload = {
-      title: formTitle,
+      title,
       subtitle: formSubtitle,
-      author: formAuthor,
-      publisher: formPublisher || 'Standard Academic Publishers',
-      department: formDepartment,
-      subject: formSubject || formDepartment,
-      description: formDescription || `${formTitle} by ${formAuthor}.`,
-      summary: formSummary || `${formTitle} reference manual.`,
-      keywords: formKeywords ? formKeywords.split(',').map(k => k.trim()) : [formDepartment, formAuthor],
-      isbn: formIsbn || `978-81-${Math.floor(100000 + Math.random() * 900000)}`,
-      callNumber: formCallNumber || `${formDepartment.substring(0, 3).toUpperCase()} ${Math.floor(100 + Math.random() * 900)}`,
+      author: author || 'Unknown Author',
+      publisher: publisher || 'Standard Academic Publishers',
+      department: dept || 'General Collection',
+      subject: subject || dept || 'General',
+      description: formDescription || `${title} by ${author || 'Unknown'}.`,
+      summary: formSummary || `${title} reference manual.`,
+      keywords: formKeywords ? formKeywords.split(',').map(k => k.trim()) : [dept, author],
+      isbn: isbn || `978-81-${Math.floor(100000 + Math.random() * 900000)}`,
+      callNumber: callNum || `${dept.substring(0, 3).toUpperCase()} ${Math.floor(100 + Math.random() * 900)}`,
       location: {
-        almariNumber: formAlmari.startsWith('Almari') ? formAlmari : `Almari ${formAlmari}`,
-        rowNumber: formRow.startsWith('Row') ? formRow : `Row ${formRow}`,
-        shelfPosition: formPosition,
-        shelfCode: `${formAlmari}-${formRow}-${formPosition.charAt(0)}`,
+        almariNumber: almari.startsWith('Almari') ? almari : `Almari ${almari}`,
+        rowNumber: row.startsWith('Row') ? row : `Row ${row}`,
+        shelfPosition: position,
+        shelfCode: `${almari}-${row}-${position.charAt(0)}`,
         floorWing: 'Central Wing'
       },
-      totalCopies: Number(formCopies) || 5,
-      availableCopies: Number(formCopies) || 5,
+      totalCopies: Number(copies) || 5,
+      availableCopies: Number(copies) || 5,
+      customAttributes: Object.keys(customAttrs).length > 0 ? customAttrs : (editingBook?.customAttributes || undefined),
       collegeId: currentCollege?.id || 'col-gec-goa'
     };
 
@@ -304,9 +556,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormKeywords('');
     setFormIsbn('');
     setFormCallNumber('');
+    setDynamicFormValues({});
   };
 
   const handleStartEdit = (b: Book) => {
+    setIsAddBookPanelOpen(true);
     setEditingBook(b);
     setFormTitle(b.title);
     setFormSubtitle(b.subtitle || '');
@@ -323,6 +577,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormRow(b.location.rowNumber);
     setFormPosition(b.location.shelfPosition);
     setFormCopies(b.totalCopies);
+
+    if (detectedCustomSchema && detectedCustomSchema.length > 0) {
+      const initialDynamic: Record<string, string> = {};
+      detectedCustomSchema.forEach(col => {
+        const norm = col.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (norm.includes('title') || norm.includes('book') || norm.includes('name')) initialDynamic[col] = b.title;
+        else if (norm.includes('author') || norm.includes('writer')) initialDynamic[col] = b.author;
+        else if (norm.includes('dept') || norm.includes('department')) initialDynamic[col] = b.department;
+        else if (norm.includes('subject')) initialDynamic[col] = b.subject;
+        else if (norm.includes('almari') || norm.includes('rack')) initialDynamic[col] = b.location.almariNumber;
+        else if (norm.includes('row')) initialDynamic[col] = b.location.rowNumber;
+        else if (norm.includes('pos')) initialDynamic[col] = b.location.shelfPosition;
+        else if (norm.includes('publisher')) initialDynamic[col] = b.publisher;
+        else if (norm.includes('isbn')) initialDynamic[col] = b.isbn;
+        else if (norm.includes('call')) initialDynamic[col] = b.callNumber;
+        else if (norm.includes('copies')) initialDynamic[col] = String(b.totalCopies);
+        else if (b.customAttributes && b.customAttributes[col]) initialDynamic[col] = b.customAttributes[col];
+        else initialDynamic[col] = '';
+      });
+      setDynamicFormValues(initialDynamic);
+    }
   };
 
   const publicPageUrl = `${window.location.origin}?collegeId=${currentCollege?.id || 'col-gec-goa'}`;
@@ -366,7 +641,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Excel / CSV Catalog Actions
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Bulk import 10,000+ books or download catalog CSV backup
+                  Import 10,000+ entries — all original columns & data rows preserved 100% as-is
                 </p>
               </div>
             </div>
@@ -376,9 +651,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 onClick={() => setIsBulkModalOpen(true)}
                 className={`px-3.5 py-1.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs shadow-xs transition-all flex items-center gap-1.5`}
+                title="Import or append new entries from Excel/CSV to catalog"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>Import Excel/CSV</span>
+                <span>+ Upload / Append Spreadsheet</span>
               </button>
 
               <button
@@ -405,181 +681,275 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Add / Edit Book Form */}
-          <div className={`lg:col-span-1 ${currentPreset.cardBg} ${currentPreset.cardRadius} p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
-            <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Plus className={`w-5 h-5 ${currentPreset.accentText}`} />
-                <span>{editingBook ? 'Edit Book' : 'Add New Book'}</span>
-              </h3>
-              {editingBook && (
-                <button
-                  onClick={() => {
-                    setEditingBook(null);
-                    setFormTitle('');
-                    setFormAuthor('');
-                  }}
-                  className="text-xs text-rose-500 hover:underline font-semibold"
-                >
-                  Cancel Edit
-                </button>
-              )}
-            </div>
+          {isAddBookPanelOpen && (
+            <div className={`lg:col-span-1 ${currentPreset.cardBg} ${currentPreset.cardRadius} p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
+              
+              {/* Form Header */}
+              <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Plus className={`w-5 h-5 ${currentPreset.accentText}`} />
+                  <span>{editingBook ? 'Edit Book' : 'Add New Book'}</span>
+                </h3>
+                <div className="flex items-center gap-2">
+                  {editingBook && (
+                    <button
+                      onClick={() => {
+                        setEditingBook(null);
+                        setFormTitle('');
+                        setFormAuthor('');
+                        setDynamicFormValues({});
+                      }}
+                      className="text-xs text-rose-500 hover:underline font-semibold"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                  {detectedCustomSchema && (
+                    <button
+                      type="button"
+                      onClick={handleResetFormSchema}
+                      className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/30"
+                      title="Reset to standard default form fields"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Default Fields</span>
+                    </button>
+                  )}
+                  
+                  {/* CUT / CLOSE FORM BUTTON TO VIEW FULLSCREEN CATALOG */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAddBookPanelOpen(false)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
+                    title="Close form panel to view College Catalog in full screen width"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+            {/* Active Custom Schema Alert Banner */}
+            {detectedCustomSchema && detectedCustomSchema.length > 0 && (
+              <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/60 rounded-2xl border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                    <Sliders className="w-3.5 h-3.5" />
+                    Custom Schema Detected ({detectedCustomSchema.length} Columns)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetFormSchema}
+                    className="text-[10px] text-indigo-500 hover:underline font-semibold"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Form fields replaced with file headers: <span className="font-mono font-bold text-indigo-600 dark:text-indigo-300">{detectedCustomSchema.slice(0, 5).join(', ')}{detectedCustomSchema.length > 5 ? '...' : ''}</span>
+                </p>
+              </div>
+            )}
 
             <form onSubmit={handleSaveBook} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Book Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
-                  placeholder="e.g. Higher Engineering Mathematics"
-                  className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius} focus:outline-none`}
-                />
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Author Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formAuthor}
-                  onChange={e => setFormAuthor(e.target.value)}
-                  placeholder="e.g. Dr. B.S. Grewal"
-                  className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius} focus:outline-none`}
-                />
-              </div>
+              {/* Dynamic Field Inputs when CSV Schema is Auto-Detected */}
+              {detectedCustomSchema && detectedCustomSchema.length > 0 ? (
+                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Auto-Detected Form Fields</span>
+                    <span className="text-[10px] text-emerald-500 font-mono">Synced from CSV</span>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Department
-                  </label>
-                  <select
-                    value={formDepartment}
-                    onChange={e => setFormDepartment(e.target.value)}
-                    className={`w-full px-2.5 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius}`}
-                  >
-                    <option value="Computer Science & Engineering">Computer Science</option>
-                    <option value="Mechanical Engineering">Mechanical Eng</option>
-                    <option value="Civil Engineering">Civil Eng</option>
-                    <option value="Electrical Engineering">Electrical Eng</option>
-                    <option value="Mathematics & Basic Sciences">Mathematics</option>
-                    <option value="Culinary Arts & Hotel Management">Culinary Arts</option>
-                    <option value="General Literature">General</option>
-                  </select>
+                  {detectedCustomSchema.map((header) => {
+                    const norm = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const isTitle = norm.includes('title') || norm.includes('book') || norm.includes('name');
+                    const isAuthor = norm.includes('author') || norm.includes('writer');
+
+                    return (
+                      <div key={header}>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                          <span>{header} {(isTitle || isAuthor) && <span className="text-rose-500">*</span>}</span>
+                          <span className="text-[9px] font-mono text-slate-400 uppercase">Column</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={isTitle || isAuthor}
+                          value={dynamicFormValues[header] || ''}
+                          onChange={(e) => setDynamicFormValues(prev => ({ ...prev, [header]: e.target.value }))}
+                          placeholder={`Enter ${header}...`}
+                          className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius} focus:outline-none`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Default Form Fields */
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Book Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formTitle}
+                      onChange={e => setFormTitle(e.target.value)}
+                      placeholder="e.g. Higher Engineering Mathematics"
+                      className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius} focus:outline-none`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Author Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formAuthor}
+                      onChange={e => setFormAuthor(e.target.value)}
+                      placeholder="e.g. Dr. B.S. Grewal"
+                      className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius} focus:outline-none`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Department
+                      </label>
+                      <select
+                        value={formDepartment}
+                        onChange={e => setFormDepartment(e.target.value)}
+                        className={`w-full px-2.5 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius}`}
+                      >
+                        <option value="Computer Science & Engineering">Computer Science</option>
+                        <option value="Mechanical Engineering">Mechanical Eng</option>
+                        <option value="Civil Engineering">Civil Eng</option>
+                        <option value="Electrical Engineering">Electrical Eng</option>
+                        <option value="Mathematics & Basic Sciences">Mathematics</option>
+                        <option value="Culinary Arts & Hotel Management">Culinary Arts</option>
+                        <option value="General Literature">General</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Subject
+                      </label>
+                      <input
+                        type="text"
+                        value={formSubject}
+                        onChange={e => setFormSubject(e.target.value)}
+                        placeholder="e.g. Calculus"
+                        className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius}`}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* By Default 3 Physical Location Options (Almari, Row, Section Position) */}
+              <div className={`p-3.5 rounded-2xl ${currentPreset.innerCardBg} border ${currentPreset.borderColor} space-y-2`}>
+                <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center justify-between">
+                  <span>Physical Shelf Location (Default 3 Mapping Options)</span>
+                  <span className="text-[10px] font-bold text-amber-500 font-mono">Shelf GPS</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={formSubject}
-                    onChange={e => setFormSubject(e.target.value)}
-                    placeholder="e.g. Calculus"
-                    className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} ${currentPreset.inputRadius}`}
-                  />
-                </div>
-              </div>
-
-              {/* Shelf Location Fields */}
-              <div className={`p-3 rounded-2xl ${currentPreset.innerCardBg} border ${currentPreset.borderColor} space-y-2`}>
-                <div className="text-xs font-bold">
-                  Physical Shelf Mapping
-                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-[10px] text-slate-500 dark:text-slate-400">Almari No</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">1. Almari / Rack</label>
                     <input
                       type="text"
                       value={formAlmari}
                       onChange={e => setFormAlmari(e.target.value)}
-                      placeholder="A1"
+                      placeholder="e.g. A1 or 2F-SF-05"
                       className={`w-full px-2 py-1.5 text-xs ${currentPreset.inputBg} rounded-lg`}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-500 dark:text-slate-400">Row No</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">2. Row No</label>
                     <input
                       type="text"
                       value={formRow}
                       onChange={e => setFormRow(e.target.value)}
-                      placeholder="R3"
+                      placeholder="e.g. Row 1 or R3"
                       className={`w-full px-2 py-1.5 text-xs ${currentPreset.inputBg} rounded-lg`}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-500 dark:text-slate-400">Position</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">3. Position Section</label>
                     <select
                       value={formPosition}
                       onChange={e => setFormPosition(e.target.value as any)}
-                      className={`w-full px-1.5 py-1.5 text-xs ${currentPreset.inputBg} rounded-lg`}
+                      className={`w-full px-1.5 py-1.5 text-xs ${currentPreset.inputBg} rounded-lg font-extrabold`}
                     >
-                      <option value="Top">Top</option>
-                      <option value="Middle">Middle</option>
-                      <option value="Bottom">Bottom</option>
+                      <option value="LEFT">LEFT (Green Section)</option>
+                      <option value="MIDDLE">MIDDLE (Blue Section)</option>
+                      <option value="RIGHT">RIGHT (Red Section)</option>
+                      <option value="Top">Top Tier</option>
+                      <option value="Bottom">Bottom Tier</option>
                     </select>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Search Keywords / AI Metadata
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleGenerateAI}
-                    disabled={isGeneratingAI}
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>Auto-Fill with AI</span>
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={formKeywords}
-                  onChange={e => setFormKeywords(e.target.value)}
-                  placeholder="e.g. calculus, differential equations, matrices"
-                  className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl focus:outline-none`}
-                />
-              </div>
+              {!detectedCustomSchema && (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Search Keywords / AI Metadata
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateAI}
+                        disabled={isGeneratingAI}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Auto-Fill with AI</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={formKeywords}
+                      onChange={e => setFormKeywords(e.target.value)}
+                      placeholder="e.g. calculus, differential equations, matrices"
+                      className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl focus:outline-none`}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Call Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formCallNumber}
-                    onChange={e => setFormCallNumber(e.target.value)}
-                    placeholder="510.76 G74H"
-                    className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Total Copies
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={formCopies}
-                    onChange={e => setFormCopies(Number(e.target.value))}
-                    className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl`}
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Call Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formCallNumber}
+                        onChange={e => setFormCallNumber(e.target.value)}
+                        placeholder="510.76 G74H"
+                        className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Total Copies
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={formCopies}
+                        onChange={e => setFormCopies(Number(e.target.value))}
+                        className={`w-full px-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl`}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <button
                 type="submit"
@@ -590,88 +960,306 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </form>
           </div>
+          )}
 
           {/* Book Catalog Table */}
-          <div className={`lg:col-span-2 ${currentPreset.cardBg} rounded-3xl p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
+          <div className={`${isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3'} ${currentPreset.cardBg} rounded-3xl p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4 transition-all duration-300`}>
             
             <div className={`flex flex-wrap items-center justify-between gap-3 border-b ${currentPreset.borderColor} pb-3`}>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
-                  <span>College Catalog ({books.length} Books)</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {currentCollege?.name} library database
-                </p>
+              <div className="flex items-center gap-3">
+                {!isAddBookPanelOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddBookPanelOpen(true)}
+                    className={`px-3 py-1.5 ${currentPreset.buttonBg} text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md hover:scale-105 transition-transform`}
+                    title="Re-open Add New Book Form Panel"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Add New Book</span>
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
+                    <span>College Catalog ({books.length} Books)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {currentCollege?.name} library database
+                  </p>
+                </div>
               </div>
 
-              <div className="relative flex items-center">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3" />
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={e => setSearchFilter(e.target.value)}
-                  placeholder="Filter catalog..."
-                  className={`pl-9 pr-3 py-1.5 text-xs ${currentPreset.inputBg} rounded-xl`}
-                />
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* View Mode Toggle Buttons */}
+                <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                  <button
+                    type="button"
+                    onClick={() => setTableViewMode('sheet')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      tableViewMode === 'sheet'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Display exact rows and columns from Excel/CSV file"
+                  >
+                    <Table className="w-3.5 h-3.5" />
+                    <span>Exact Sheet View ({getActiveTableColumns().length} Cols)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableViewMode('standard')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      tableViewMode === 'standard'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Display compact standard catalog cards"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Standard View</span>
+                  </button>
+                </div>
+
+                <div className="relative flex items-center">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={e => setSearchFilter(e.target.value)}
+                    placeholder="Filter catalog..."
+                    className={`pl-9 pr-3 py-1.5 text-xs ${currentPreset.inputBg} rounded-xl`}
+                  />
+                </div>
+
+                {onClearCatalog && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowClearSheetModal(true);
+                      setDeleteConfirmInput('');
+                    }}
+                    disabled={isClearing}
+                    className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                    title="Delete full sheet / clear all books in catalog"
+                  >
+                    {isClearing ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isClearing ? 'Deleting...' : 'Delete Full Sheet'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
             {filteredBooks.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className={`${currentPreset.innerCardBg} text-slate-500 dark:text-slate-400 font-semibold uppercase`}>
-                    <tr>
-                      <th className="py-2.5 px-3 rounded-l-xl">Book Title & Author</th>
-                      <th className="py-2.5 px-3">Dept</th>
-                      <th className="py-2.5 px-3">Shelf Location</th>
-                      <th className="py-2.5 px-3">Copies</th>
-                      <th className="py-2.5 px-3 rounded-r-xl text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredBooks.map(b => (
-                      <tr key={b.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-slate-900 dark:text-white">{b.title}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">by {b.author}</div>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded-md ${currentPreset.badgeBg} font-medium`}>
-                            {b.department}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 font-mono font-semibold text-slate-700 dark:text-slate-300">
-                          {b.location.almariNumber} - {b.location.rowNumber} ({b.location.shelfPosition})
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {b.availableCopies}/{b.totalCopies}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleStartEdit(b)}
-                              className={`p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 ${currentPreset.accentText}`}
-                              title="Edit"
+              tableViewMode === 'sheet' ? (
+                /* EXACT SPREADSHEET GRID VIEW */
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-1.5 py-1.5 font-medium bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold">
+                        <FileSpreadsheet className="w-4 h-4 shrink-0 text-indigo-500" />
+                        <span>Showing all {getActiveTableColumns().length} spreadsheet columns</span>
+                      </span>
+                      <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono px-2 py-0.5 rounded-full font-bold">
+                        Scroll horizontally →
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Smooth Horizontal Scroll Navigation Controls */}
+                      <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => scrollTable('left')}
+                          className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-200 transition-colors"
+                          title="Scroll columns left"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>Left</span>
+                        </button>
+                        <div className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
+                        <button
+                          type="button"
+                          onClick={() => scrollTable('right')}
+                          className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-200 transition-colors"
+                          title="Scroll columns right"
+                        >
+                          <span>Right</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {!isAddBookPanelOpen && (
+                        <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                          FULLSCREEN ACTIVE
+                        </span>
+                      )}
+                      <span className="font-mono text-slate-400">{filteredBooks.length} Rows</span>
+                    </div>
+                  </div>
+
+                  <div ref={tableScrollRef} className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner max-w-full scroll-smooth">
+                    <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+                      <thead className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-extrabold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-3 border-b border-r border-slate-200 dark:border-slate-800 bg-slate-200/70 dark:bg-slate-800/80 text-center w-10">
+                            #
+                          </th>
+                          {getActiveTableColumns().map((colHeader, idx) => (
+                            <th
+                              key={idx}
+                              className="py-2.5 px-3 border-b border-r border-slate-200 dark:border-slate-800 min-w-[140px] max-w-[300px]"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => onDeleteBook(b.id)}
-                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-bold">{colHeader}</span>
+                                <span className="text-[9px] font-mono text-indigo-500 lowercase opacity-70">col</span>
+                              </div>
+                            </th>
+                          ))}
+                          <th className="py-2.5 px-3 border-b border-r border-slate-200 dark:border-slate-800 min-w-[120px] bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                            Shelf Location
+                          </th>
+                          <th className="py-2.5 px-3 border-b border-slate-200 dark:border-slate-800 text-right sticky right-0 bg-slate-100 dark:bg-slate-900 z-10 min-w-[80px]">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
+                        {filteredBooks.map((b, rowIdx) => (
+                          <tr key={b.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-colors">
+                            <td className="py-2.5 px-2.5 border-r border-slate-100 dark:border-slate-800/60 text-slate-400 text-center font-mono font-bold bg-slate-50/50 dark:bg-slate-900/30">
+                              {rowIdx + 1}
+                            </td>
+                            {getActiveTableColumns().map((colHeader, colIdx) => {
+                              const cellValue = getCellValue(b, colHeader);
+                              const isLink = cellValue.startsWith('http://') || cellValue.startsWith('https://');
+
+                              return (
+                                <td
+                                  key={colIdx}
+                                  className="py-2.5 px-3 border-r border-slate-100 dark:border-slate-800/60 max-w-[300px] truncate font-sans text-slate-800 dark:text-slate-200"
+                                  title={cellValue}
+                                >
+                                  {isLink ? (
+                                    <a
+                                      href={cellValue}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 inline-flex font-medium"
+                                    >
+                                      <span className="truncate max-w-[200px]">{cellValue}</span>
+                                      <ExternalLink className="w-3 h-3 shrink-0" />
+                                    </a>
+                                  ) : (
+                                    <span>{cellValue}</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="py-2.5 px-3 border-r border-slate-100 dark:border-slate-800/60 font-mono font-bold text-amber-600 dark:text-amber-400">
+                              {b.location.almariNumber} - {b.location.rowNumber} ({b.location.shelfPosition})
+                            </td>
+                            <td className="py-2.5 px-3 text-right sticky right-0 bg-white dark:bg-slate-900 z-10">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleStartEdit(b)}
+                                  className={`p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 ${currentPreset.accentText}`}
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setBookToDelete(b)}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* STANDARD COMPACT CATALOG VIEW */
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className={`${currentPreset.innerCardBg} text-slate-500 dark:text-slate-400 font-semibold uppercase`}>
+                      <tr>
+                        <th className="py-2.5 px-3 rounded-l-xl">Book Title & Author</th>
+                        <th className="py-2.5 px-3">Dept</th>
+                        <th className="py-2.5 px-3">Shelf Location</th>
+                        <th className="py-2.5 px-3">Copies</th>
+                        <th className="py-2.5 px-3 rounded-r-xl text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {filteredBooks.map(b => (
+                        <tr key={b.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-slate-900 dark:text-white">{b.title}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">by {b.author}</div>
+                            {b.customAttributes && (
+                              <div className="flex flex-wrap items-center gap-1 mt-1">
+                                {Object.entries(b.customAttributes).slice(0, 4).map(([key, val]) => (
+                                  <span key={key} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20">
+                                    {key}: {String(val)}
+                                  </span>
+                                ))}
+                                {Object.keys(b.customAttributes).length > 4 && (
+                                  <span className="text-[9px] font-mono text-slate-400">
+                                    +{Object.keys(b.customAttributes).length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2 py-0.5 rounded-md ${currentPreset.badgeBg} font-medium`}>
+                              {b.department}
+                            </span>
+                            {b.subject && b.subject !== b.department && (
+                              <div className="text-[10px] text-slate-400 font-medium mt-0.5">{b.subject}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 font-mono font-semibold text-slate-700 dark:text-slate-300">
+                            {b.location.almariNumber} - {b.location.rowNumber} ({b.location.shelfPosition})
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                              {b.availableCopies}/{b.totalCopies}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleStartEdit(b)}
+                                className={`p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 ${currentPreset.accentText}`}
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setBookToDelete(b)}
+                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             ) : (
               <div className="py-12 text-center text-xs text-slate-400 space-y-2">
                 <div>No books in {currentCollege?.name}'s catalog yet.</div>
@@ -750,6 +1338,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             currentCollege={currentCollege}
             onUpdateCollege={onUpdateCollege}
             onLogout={onLogout}
+            onSelectTab={setActiveTab}
+            onOpenQRModal={onOpenQRModal}
+            onOpenBarcodeModal={onOpenBarcodeModal}
           />
         </motion.div>
       )}
@@ -1181,14 +1772,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </h5>
                                 
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1.5 text-[10px] font-bold text-slate-400">
-                                  <span>Issued: <span className="text-slate-600 dark:text-slate-300">{rec.issueDate}</span></span>
-                                  <span>Due: <span className={isLate ? "text-rose-600 font-extrabold" : "text-slate-600 dark:text-slate-300"}>{rec.dueDate}</span></span>
+                                  <span>Issued: <span className="text-slate-600 dark:text-slate-300">{rec.issueDate || (rec.issuedAt ? new Date(rec.issuedAt).toISOString().split('T')[0] : 'Today')}</span></span>
+                                  <span>Due: <span className={isLate ? "text-rose-600 font-extrabold" : "text-slate-600 dark:text-slate-300"}>{rec.dueDate || (rec.returnDueDate ? new Date(rec.returnDueDate).toISOString().split('T')[0] : 'TBD')}</span></span>
                                   {rec.status === 'Returned' && (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
-                                      Returned: {rec.returnDate}
+                                      Returned: {rec.returnDate || 'Settle Date'}
                                     </span>
                                   )}
                                 </div>
+
+                                {rec.extraDetails && (
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-zinc-800/40 text-[10px] text-slate-500 dark:text-slate-400">
+                                    {rec.borrowType === 'home' && (
+                                      <>
+                                        <span className="bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 font-extrabold uppercase text-[9px]">Home Loan</span>
+                                        {rec.extraDetails.contactPhone && (
+                                          <span>📞 Phone: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.contactPhone}</strong></span>
+                                        )}
+                                        {rec.extraDetails.hostelOrAddress && (
+                                          <span>🏠 Room/Address: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.hostelOrAddress}</strong></span>
+                                        )}
+                                      </>
+                                    )}
+                                    {rec.borrowType === 'reading_room' && (
+                                      <>
+                                        <span className="bg-blue-100 dark:bg-blue-950/40 px-1.5 py-0.5 rounded text-blue-800 dark:text-blue-300 font-extrabold uppercase text-[9px]">Reading Room</span>
+                                        {rec.extraDetails.seatNumber && (
+                                          <span>🪑 Seat: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.seatNumber}</strong></span>
+                                        )}
+                                        {rec.extraDetails.readingDuration && (
+                                          <span>⏱️ Session: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.readingDuration}</strong></span>
+                                        )}
+                                      </>
+                                    )}
+                                    {rec.borrowType === 'project_work' && (
+                                      <>
+                                        <span className="bg-emerald-100 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded text-emerald-800 dark:text-emerald-300 font-extrabold uppercase text-[9px]">Project Work</span>
+                                        {rec.extraDetails.projectName && (
+                                          <span>🔬 Lab: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.projectName}</strong></span>
+                                        )}
+                                        {rec.extraDetails.guideName && (
+                                          <span>👨‍🏫 Guide: <strong className="text-slate-700 dark:text-slate-200">{rec.extraDetails.guideName}</strong></span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Action side */}
@@ -1265,6 +1894,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       <BulkImportModal
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
+        onSchemaDetected={handleSchemaDetected}
         onImportBooks={async (importedBooks) => {
           if (onBulkAddBooks) {
             return await onBulkAddBooks(importedBooks);
@@ -1277,6 +1907,231 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }}
         collegeName={currentCollege?.name}
       />
+
+      {/* Auto-Detect Fields Info Modal */}
+      {showSchemaInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className={`${currentPreset.modalBg} ${currentPreset.cardRadius} max-w-lg w-full border ${currentPreset.cardBorder} shadow-2xl p-6 relative space-y-5`}>
+            <button
+              onClick={() => setShowSchemaInfoModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Auto-Detect Fields Feature
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  How dynamic form column adaptation works
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/60 space-y-1.5">
+                <div className="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <Upload className="w-4 h-4" />
+                  <span>1. Append New Entries (+ Append New Entries Button)</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Whether you imported 23,000 books yesterday or need to add 23 new books today, simply upload your spreadsheet! It <strong>appends new books directly into the existing database</strong> without needing manual form entry or re-uploading old files. Column headers are also auto-detected to customize your form fields.
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50/60 dark:bg-amber-950/40 rounded-xl border border-amber-100 dark:border-amber-900/60 space-y-1.5">
+                <div className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4" />
+                  <span>2. Standalone "Auto-Detect Fields" Button</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Use this button if you only want to <strong>update the Add / Edit Book form fields</strong> to match your spreadsheet's custom column headers <strong>without saving any books</strong> to the database.
+                </p>
+              </div>
+
+              <div className="p-2.5 bg-slate-100 dark:bg-slate-900/80 rounded-xl text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                💡 <strong>Default Physical Shelf Options:</strong> Location inputs — Almari/Rack No, Row No, and Shelf Position Section (LEFT, MIDDLE, RIGHT) — remain permanently available by default in both modes.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSchemaInfoModal(false)}
+                className={`px-4 py-2 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-xs font-bold`}
+              >
+                Got It!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification Banner */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 max-w-md text-xs font-semibold ${
+              toast.type === 'success'
+                ? 'bg-emerald-900 text-emerald-100 border-emerald-700'
+                : toast.type === 'error'
+                ? 'bg-rose-900 text-rose-100 border-rose-700'
+                : 'bg-slate-900 text-slate-100 border-slate-700'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />}
+            {toast.type === 'info' && <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />}
+            <span className="flex-1 leading-snug">{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Clear Full Sheet Modal */}
+      {showClearSheetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-4">
+              <div className="p-3 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Entire Catalog Sheet?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{currentCollege?.name || 'College Library'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-6 text-xs text-slate-600 dark:text-slate-300">
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 font-medium">
+                ⚠️ <strong>WARNING:</strong> This will permanently erase <strong>ALL {books.length} books</strong> in this college catalog sheet from the database. This action cannot be undone.
+              </div>
+              <p className="font-medium text-slate-700 dark:text-slate-300">
+                To confirm deletion, please type <span className="font-mono font-bold text-rose-600 dark:text-rose-400 underline">DELETE</span> below:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                placeholder='Type "DELETE" here'
+                className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-900 dark:text-white"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowClearSheetModal(false);
+                  setDeleteConfirmInput('');
+                }}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteConfirmInput.trim().toUpperCase() !== 'DELETE' || isClearing}
+                onClick={async () => {
+                  if (!onClearCatalog) return;
+                  setIsClearing(true);
+                  try {
+                    await onClearCatalog();
+                    setDetectedCustomSchema(null);
+                    localStorage.removeItem('library_detected_form_schema');
+                    setShowClearSheetModal(false);
+                    setDeleteConfirmInput('');
+                    setToast({ type: 'success', message: 'Entire catalog sheet permanently deleted!' });
+                  } catch (err: any) {
+                    setToast({ type: 'error', message: err.message || 'Failed to delete catalog sheet.' });
+                  } finally {
+                    setIsClearing(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2 shadow-md shadow-rose-600/20"
+              >
+                {isClearing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Deleting Sheet...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Permanently Delete Sheet</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Book Delete Confirmation Modal */}
+      {bookToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-4">
+              <div className="p-3 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Book Entry?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Remove from library database</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-6 text-xs text-slate-600 dark:text-slate-300">
+              <p className="text-slate-600 dark:text-slate-300">Are you sure you want to permanently delete this book from the library catalog?</p>
+              <div className="p-3.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white">
+                "{bookToDelete.title}" <span className="font-normal text-slate-500 dark:text-slate-400 block text-[11px] mt-0.5">by {bookToDelete.author}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBookToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await onDeleteBook(bookToDelete.id);
+                    setToast({ type: 'success', message: `Book "${bookToDelete.title}" deleted permanently!` });
+                  } catch (err: any) {
+                    setToast({ type: 'error', message: 'Failed to delete book.' });
+                  } finally {
+                    setBookToDelete(null);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all flex items-center gap-1.5 shadow-md shadow-rose-600/20"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Permanently</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

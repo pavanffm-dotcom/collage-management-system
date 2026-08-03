@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import {
   parseCSVToRawDataset,
-  autoDetectColumnMapping,
+  convertExactRawRowsToBooks,
   convertRawRowsToBooks,
   TARGET_BOOK_FIELDS,
   downloadSampleTemplateCSV
@@ -29,13 +29,15 @@ interface BulkImportModalProps {
   onClose: () => void;
   onImportBooks: (importedBooks: any[]) => Promise<any>;
   collegeName?: string;
+  onSchemaDetected?: (headers: string[]) => void;
 }
 
 export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   isOpen,
   onClose,
   onImportBooks,
-  collegeName
+  collegeName,
+  onSchemaDetected
 }) => {
   const { currentPreset } = useTheme();
 
@@ -82,13 +84,14 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           return;
         }
 
-        const autoMap = autoDetectColumnMapping(headers);
         setRawHeaders(headers);
         setRawRows(rows);
-        setColumnMapping(autoMap);
+        if (onSchemaDetected) {
+          onSchemaDetected(headers);
+        }
 
-        // Pre-generate mapped books preview
-        const initialBooks = convertRawRowsToBooks(rows, autoMap);
+        // Convert raw rows to exact books list without auto-detect/mapping overrides
+        const initialBooks = convertExactRawRowsToBooks(rows);
         setParsedBooks(initialBooks);
 
         setStep('map_columns');
@@ -176,8 +179,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20">
-                Universal SaaS Schema Adapter
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Safe Append Mode (Preserves Existing Database)
               </span>
               {collegeName && (
                 <span className="text-[10px] font-medium text-slate-400">
@@ -186,7 +189,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               )}
             </div>
             <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-              Import Catalog from Any Excel / CSV File
+              Import & Append New Entries to Catalog
             </h3>
           </div>
         </div>
@@ -248,100 +251,83 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
         )}
 
-        {/* STEP 2: INTERACTIVE COLUMN MAPPER & LIVE PREVIEW */}
+        {/* STEP 2: EXACT SPREADSHEET PREVIEW & IMPORT */}
         {step === 'map_columns' && (
           <div className="space-y-5 overflow-y-auto pr-1">
             
             {/* Header info bar */}
             <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 font-bold text-indigo-950 dark:text-indigo-200">
-                <Sliders className="w-4 h-4 text-indigo-500" />
-                <span>Detected {rawHeaders.length} columns & {rawRows.length} data rows</span>
+              <div className="flex items-center gap-2 font-extrabold text-indigo-950 dark:text-indigo-200">
+                <FileSpreadsheet className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>Spreadsheet Loaded: {rawHeaders.length} Exact Columns • {rawRows.length} Data Rows</span>
               </div>
-              {customAttributesCount > 0 && (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold text-[10px]">
-                  + {customAttributesCount} custom fields preserved as metadata
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={handleReset}
+                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                Upload Different File
+              </button>
             </div>
 
-            {/* Column Mapping Grid */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Verify or Change Column Mapping:</span>
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-1 border rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                {TARGET_BOOK_FIELDS.map((field) => (
-                  <div key={field.id} className="p-2.5 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-800 dark:text-slate-200">
-                        {field.label} {field.required && <span className="text-rose-500">*</span>}
-                      </span>
-                      {columnMapping[field.id] && (
-                        <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-0.5">
-                          <CheckCircle2 className="w-3 h-3" /> Auto-Mapped
-                        </span>
-                      )}
-                    </div>
-
-                    <select
-                      value={columnMapping[field.id] || ''}
-                      onChange={(e) => handleMappingChange(field.id, e.target.value)}
-                      className="w-full text-xs p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-mono"
-                    >
-                      <option value="">-- Skip / Default Value --</option>
-                      {rawHeaders.map((header) => (
-                        <option key={header} value={header}>
-                          Column: "{header}"
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Live Sample Data Preview */}
+            {/* Exact Spreadsheet Columns List Preview */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                 <span className="flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-indigo-500" />
-                  Live Import Preview ({parsedBooks.length} Books Ready)
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Detected Columns in Sheet ({rawHeaders.length}):</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  Upload Different File
-                </button>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  100% Exact Columns Preserved
+                </span>
               </div>
 
-              <div className="max-h-36 overflow-y-auto space-y-2 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                {parsedBooks.slice(0, 3).map((b, idx) => (
-                  <div key={idx} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
-                    <div className="truncate min-w-0">
-                      <div className="font-bold text-slate-900 dark:text-white truncate">
-                        {b.title}
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        By {b.author} • Dept: {b.department} • Acc: {b.accessionNumber}
-                      </div>
-                      {b.customAttributes && (
-                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono truncate">
-                          Custom Extra: {Object.entries(b.customAttributes).map(([k, v]) => `${k}: ${v}`).join(' | ')}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2 py-1 rounded-lg inline-block">
-                        {b.almari}-{b.row} ({b.copies} copies)
-                      </span>
-                    </div>
-                  </div>
+              <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 max-h-28 overflow-y-auto">
+                {rawHeaders.map((header, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[10px] font-mono font-bold px-2 py-1 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs"
+                  >
+                    {idx + 1}. {header}
+                  </span>
                 ))}
+              </div>
+            </div>
+
+            {/* Scrollable Live Sample Rows Preview */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Exact Sample Rows Preview (First 5 Rows):</span>
+              </h4>
+
+              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl max-h-48 scroll-smooth bg-white dark:bg-slate-900">
+                <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+                  <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-extrabold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-2 border-b border-r border-slate-200 dark:border-slate-700 text-center">#</th>
+                      {rawHeaders.map((h, i) => (
+                        <th key={i} className="p-2 border-b border-r border-slate-200 dark:border-slate-700">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
+                    {rawRows.slice(0, 5).map((row, rIdx) => (
+                      <tr key={rIdx} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-colors">
+                        <td className="p-2 border-r border-slate-100 dark:border-slate-800 text-center font-mono text-slate-400">
+                          {rIdx + 1}
+                        </td>
+                        {rawHeaders.map((h, cIdx) => (
+                          <td key={cIdx} className="p-2 border-r border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-200">
+                            {row[h] || <span className="text-slate-300 dark:text-slate-600">-</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -357,17 +343,17 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               type="button"
               onClick={handleConfirmImport}
               disabled={isImporting || parsedBooks.length === 0}
-              className={`w-full py-3.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-extrabold text-sm text-white shadow-lg flex items-center justify-center gap-2 transition-all`}
+              className={`w-full py-3.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-extrabold text-sm text-white shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.01]`}
             >
               {isImporting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Processing & Deduplicating {parsedBooks.length} Books...</span>
+                  <span>Importing {parsedBooks.length} Rows with {rawHeaders.length} Exact Columns...</span>
                 </>
               ) : (
                 <>
                   <Database className="w-4.5 h-4.5" />
-                  <span>Import All {parsedBooks.length} Books to Catalog</span>
+                  <span>Import All {parsedBooks.length} Rows (Exact Sheet View)</span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </>
               )}

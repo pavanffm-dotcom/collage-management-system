@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, BookOpen, CheckCircle, Clock, Sparkles, Navigation, ChevronRight } from 'lucide-react';
+import { MapPin, BookOpen, CheckCircle, Clock, Sparkles, Navigation, ChevronRight, QrCode } from 'lucide-react';
 import { Book, AISearchResult } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
@@ -7,9 +7,10 @@ interface BookCardProps {
   book: Book;
   aiResult?: AISearchResult;
   onSelectBook: (book: Book, openMap?: boolean) => void;
+  onBorrow?: (book: Book) => void;
 }
 
-export const BookCard: React.FC<BookCardProps> = React.memo(({ book, aiResult, onSelectBook }) => {
+export const BookCard: React.FC<BookCardProps> = React.memo(({ book, aiResult, onSelectBook, onBorrow }) => {
   const { currentPreset } = useTheme();
   const isAvailable = book.availability === 'Available' && book.availableCopies > 0;
 
@@ -96,15 +97,15 @@ export const BookCard: React.FC<BookCardProps> = React.memo(({ book, aiResult, o
         </div>
       )}
 
-      {/* Shelf Location Box */}
+      {/* Shelf Location Box with Blinking Indicator Hint */}
       <div className={`p-3.5 ${currentPreset.inputRadius} border ${currentPreset.borderColor} ${currentPreset.innerCardBg} mb-4 flex items-center justify-between`}>
         <div className="space-y-0.5">
           <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider flex items-center gap-1">
             <MapPin className={`w-3 h-3 ${currentPreset.accentText}`} />
-            Physical Shelf GPS Location
+            Shelf Location (Red Light Blink)
           </div>
           <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-            Almari {book.location.almariNumber.replace(/\D/g, '')} • Row {book.location.rowNumber.replace(/\D/g, '')} • {book.location.shelfPosition} Shelf
+            Almari {book.location.almariNumber.replace(/\D/g, '')} • Row {book.location.rowNumber.replace(/\D/g, '')} • {book.location.shelfPosition}
           </div>
         </div>
 
@@ -114,21 +115,33 @@ export const BookCard: React.FC<BookCardProps> = React.memo(({ book, aiResult, o
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => onSelectBook(book, true)}
-          className={`flex-1 py-2.5 px-3 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm`}
-        >
-          <Navigation className="w-4 h-4" />
-          <span>View Location</span>
-        </button>
-        <button
-          onClick={() => onSelectBook(book, false)}
-          className={`py-2.5 px-3 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-colors`}
-        >
-          <span>Details</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
+      <div className="space-y-2">
+        {onBorrow && isAvailable && (
+          <button
+            onClick={() => onBorrow(book)}
+            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all animate-pulse"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Scan & Borrow / Take Home</span>
+          </button>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => onSelectBook(book, true)}
+            className={`flex-1 py-2 px-3 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm`}
+          >
+            <Navigation className="w-3.5 h-3.5" />
+            <span>View Shelf Map</span>
+          </button>
+          <button
+            onClick={() => onSelectBook(book, false)}
+            className={`py-2 px-3 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} font-medium text-xs flex items-center justify-center gap-1 transition-colors`}
+          >
+            <span>Details</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
     </div>

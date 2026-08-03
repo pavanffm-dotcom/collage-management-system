@@ -9,9 +9,10 @@ interface BookDetailModalProps {
   book: Book | null;
   initialTab?: 'details' | 'map';
   onClose: () => void;
+  onBorrow?: (book: Book) => void;
 }
 
-export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialTab = 'details', onClose }) => {
+export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialTab = 'details', onClose, onBorrow }) => {
   const { currentPreset } = useTheme();
   const [activeTab, setActiveTab] = useState<'details' | 'map'>(initialTab);
 
@@ -259,8 +260,19 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialT
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {onBorrow && isAvailable && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onBorrow(book);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all animate-pulse"
+              >
+                <span>Scan & Borrow / Take Home</span>
+              </button>
+            )}
             <button
               onClick={handleShare}
               className="px-3.5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"

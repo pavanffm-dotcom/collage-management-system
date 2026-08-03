@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode } from 'lucide-react';
+import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode, Camera } from 'lucide-react';
 import { Book, College, AISearchResult, AISearchResponse } from '../types';
-import { BookCard } from './BookCard';
+import { StudentShelfCard } from './StudentShelfCard';
 import { BookDetailModal } from './BookDetailModal';
+import { BorrowBookModal } from './BorrowBookModal';
+import { DirectBarcodeBorrowModal } from './DirectBarcodeBorrowModal';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -38,6 +40,8 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [borrowingBook, setBorrowingBook] = useState<Book | null>(null);
+  const [isDirectBorrowOpen, setIsDirectBorrowOpen] = useState(false);
 
   // Departments list for filter (Memoized to prevent recalculated overhead on every render)
   const departments = useMemo(() => {
@@ -225,29 +229,30 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                   </div>
 
                   {/* Filters */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-slate-600 dark:text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <Filter className={`w-3.5 h-3.5 ${currentPreset.accentText}`} />
-                      <span>Department:</span>
-                      <select
-                        value={selectedDept}
-                        onChange={e => setSelectedDept(e.target.value)}
-                        className={`${currentPreset.inputBg} ${currentPreset.buttonRadius} px-2.5 py-1 text-xs text-slate-900 dark:text-white`}
-                      >
-                        <option value="All">All Departments</option>
-                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
-
-                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <div className="flex items-center justify-end pt-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    <label className="flex items-center gap-2 cursor-pointer select-none py-1.5 px-3.5 bg-slate-100/50 dark:bg-slate-800/40 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-all border border-slate-200/40 dark:border-slate-800/40">
                       <input
                         type="checkbox"
                         checked={onlyAvailable}
                         onChange={e => setOnlyAvailable(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                        className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
-                      <span>Show Only Available Books</span>
+                      <span className="font-semibold">Show Only Available Books</span>
                     </label>
+                  </div>
+
+                  {/* Direct Barcode Scan & Borrow Button */}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setIsDirectBorrowOpen(true)}
+                      className={`w-full py-3 px-6 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-sm font-black flex items-center justify-center gap-2 shadow-xl transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer`}
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span>Borrow Book</span>
+                    </button>
+                    <p className="text-center text-[11px] text-slate-500 dark:text-slate-400 mt-2.5 font-medium leading-relaxed max-w-lg mx-auto">
+                      💡 <strong>What is Borrowing?</strong> You can instantly check out books to <strong className="text-slate-700 dark:text-slate-200">Take Home</strong>, study inside the <strong className="text-slate-700 dark:text-slate-200">Reading Room</strong>, or use for semester <strong className="text-slate-700 dark:text-slate-200">Project / Lab work</strong>.
+                    </p>
                   </div>
                 </motion.div>
               ) : (
@@ -323,20 +328,60 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
         {/* Results Section */}
         <div className="space-y-6">
           
-          {/* Header showing result count or scope message */}
-          <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
-              <span>
-                {searchMode === 'exact'
-                  ? 'Library Catalog'
-                  : `AI Search Results for "${aiQuery}"`}
-              </span>
-            </h3>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${currentPreset.badgeBg}`}>
-              {searchMode === 'exact' ? `${books.length} Books` : `${aiResults.length} Matched`}
-            </span>
-          </div>
+          {!hasSearched ? (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`py-12 px-6 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-4 shadow-lg`}
+            >
+              <div className="w-16 h-16 bg-amber-500/20 border border-amber-500/40 rounded-full flex items-center justify-center mx-auto text-amber-500 shadow-inner">
+                <QrCode className="w-8 h-8 animate-pulse" />
+              </div>
+              <div className="space-y-2 max-w-lg mx-auto">
+                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
+                  Ready to Locate & Borrow Books
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                  Search for any book by title or describe your topic above (or click a sample tag) to find its exact shelf position, blinking red light guide, and scan your student ID barcode to take it home or to the reading room.
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                {[
+                  'Fish Curry of Goa',
+                  'Python Beginners',
+                  'Organic Chemistry',
+                  'Java Interview',
+                  'Indian Constitution'
+                ].map((sample, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setAiQuery(sample);
+                      handleAISearch(sample);
+                    }}
+                    className={`text-xs px-3.5 py-1.5 rounded-full ${currentPreset.secondaryButtonBg} border ${currentPreset.borderColor} font-medium hover:scale-105 transition-all shadow-xs`}
+                  >
+                    🔍 "{sample}"
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <>
+              {/* Header showing result count or scope message */}
+              <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
+                  <span>
+                    {searchMode === 'exact'
+                      ? 'Search Results'
+                      : `AI Search Results for "${aiQuery}"`}
+                  </span>
+                </h3>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${currentPreset.badgeBg}`}>
+                  {searchMode === 'exact' ? `${books.length} Books` : `${aiResults.length} Matched`}
+                </span>
+              </div>
 
           {/* AI Concept Badges */}
           {searchMode === 'ai' && extractedConcepts.length > 0 && (
@@ -403,9 +448,10 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                         visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
                       }}
                     >
-                      <BookCard
+                      <StudentShelfCard
                         book={book}
                         onSelectBook={setSelectedBook}
+                        onBorrow={setBorrowingBook}
                       />
                     </motion.div>
                   ))}
@@ -451,10 +497,11 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                         visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
                       }}
                     >
-                      <BookCard
+                      <StudentShelfCard
                         book={res.book}
                         aiResult={res}
                         onSelectBook={setSelectedBook}
+                        onBorrow={setBorrowingBook}
                       />
                     </motion.div>
                   ))}
@@ -477,6 +524,8 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
               )
             )}
           </AnimatePresence>
+            </>
+          )}
 
         </div>
 
@@ -487,6 +536,34 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
         <BookDetailModal
           book={selectedBook}
           onClose={() => setSelectedBook(null)}
+          onBorrow={setBorrowingBook}
+        />
+      )}
+
+      {/* Borrow Book Modal with Blinking Red Light & Barcode Scanner */}
+      {borrowingBook && (
+        <BorrowBookModal
+          book={borrowingBook}
+          onClose={() => setBorrowingBook(null)}
+          onSuccess={() => {
+            // Refresh books if needed
+            if (currentCollege) {
+              fetchCollegeBooks(currentCollege.id);
+            }
+          }}
+        />
+      )}
+
+      {/* Direct Barcode Borrow Modal */}
+      {isDirectBorrowOpen && currentCollege && (
+        <DirectBarcodeBorrowModal
+          college={currentCollege}
+          onClose={() => setIsDirectBorrowOpen(false)}
+          onSuccess={() => {
+            if (currentCollege) {
+              fetchCollegeBooks(currentCollege.id);
+            }
+          }}
         />
       )}
 

@@ -1,4 +1,4 @@
-export type ShelfPosition = 'Top' | 'Middle' | 'Bottom';
+export type ShelfPosition = 'Top' | 'Middle' | 'Bottom' | 'LEFT' | 'MIDDLE' | 'RIGHT' | 'Left' | 'Right';
 
 export interface College {
   id: string;          // e.g. "col-gec-goa"
@@ -44,6 +44,7 @@ export interface Book {
   location: ShelfLocation;
   coverImage?: string;
   customAttributes?: Record<string, string>; // Dynamic unmapped CSV columns (e.g. Price, Donor, Barcode)
+  rawCsvData?: Record<string, string>; // Complete original row data from spreadsheet upload
   dateAdded: string;
   lastUpdated: string;
 }
@@ -84,5 +85,18 @@ export interface IssuedBook {
   returnDate?: string;
   fineAmount?: number;
   status: 'Issued' | 'Returned';
+  borrowType?: 'home' | 'reading_room' | 'project_work';
+  issuedAt?: string;
+  returnDueDate?: string;
+  extraDetails?: {
+    homeDurationDays?: number;
+    hostelOrAddress?: string;
+    contactPhone?: string;
+    seatNumber?: string;
+    readingDuration?: string;
+    projectName?: string;
+    guideName?: string;
+    projectDurationDays?: number;
+  };
 }
 

@@ -5,6 +5,8 @@ import { PublicStudentView } from './components/PublicStudentView';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { QRModal } from './components/QRModal';
+import { BarcodeShelfMapperModal } from './components/BarcodeShelfMapperModal';
+import { ThemeModal } from './components/ThemeModal';
 import { HomePortal } from './components/HomePortal';
 import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode } from 'lucide-react';
 
@@ -38,6 +40,7 @@ function AppContent({
   fetchAdminStats,
   departments,
   handleUpdateCollege,
+  handleClearCatalog,
   
   // Custom states passed to AppContent
   selectedDept,
@@ -46,6 +49,7 @@ function AppContent({
 }: any) {
   const { currentPreset } = useTheme();
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [scannerModalTab, setScannerModalTab] = useState<'qr' | 'barcode'>('qr');
 
   // If there's no logged-in student or faculty profile, display the Home Portal signup sheet
   if (!authUser) {
@@ -61,7 +65,15 @@ function AppContent({
           authUser={null}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onLogout={handleLogout}
-          onOpenQRModal={() => setIsQRModalOpen(true)}
+          onOpenQRModal={() => {
+            setScannerModalTab('qr');
+            setIsQRModalOpen(true);
+          }}
+          onOpenBarcodeModal={() => {
+            setScannerModalTab('barcode');
+            setIsQRModalOpen(true);
+          }}
+          onCloseQRModal={() => setIsQRModalOpen(false)}
           activeView={activeView}
           setActiveView={setActiveView}
           adminTab={adminTab}
@@ -112,7 +124,15 @@ function AppContent({
         authUser={authUser}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
-        onOpenQRModal={() => setIsQRModalOpen(true)}
+        onOpenQRModal={() => {
+          setScannerModalTab('qr');
+          setIsQRModalOpen(true);
+        }}
+        onOpenBarcodeModal={() => {
+          setScannerModalTab('barcode');
+          setIsQRModalOpen(true);
+        }}
+        onCloseQRModal={() => setIsQRModalOpen(false)}
         activeView={activeView}
         setActiveView={setActiveView}
         adminTab={adminTab}
@@ -122,44 +142,32 @@ function AppContent({
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
       />
 
-      {/* Main Content Area (Wraps QRModal, main & footer to scroll independently from sidebar) */}
+      {/* Theme Customization Modal */}
+      <ThemeModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+      />
+
+      {/* Main Content Area (Wraps BarcodeShelfMapperModal, main & footer to scroll independently from sidebar) */}
       <div className="flex-1 flex flex-col min-w-0 lg:h-screen lg:overflow-y-auto relative z-10 w-full">
-        {/* Entrance QR Generator & Simulator Modal */}
-        <QRModal
+        {/* Code Scanner & 2D Shelf Locator Modal */}
+        <BarcodeShelfMapperModal
           isOpen={isQRModalOpen}
           onClose={() => setIsQRModalOpen(false)}
           currentCollege={currentCollege}
-          onSimulateScan={() => {
+          books={books}
+          onUpdateBook={handleUpdateBook}
+          initialTab={scannerModalTab}
+          onSimulateEntranceScan={() => {
             setSelectedDept('library');
             setActiveView('public');
           }}
         />
 
         {/* Main Application Body Container */}
-        <main className="flex-1 pb-16 md:pb-8 z-10 px-4 sm:px-6 lg:px-10 py-6 w-full max-w-full">
+        <main className="flex-1 pb-28 lg:pb-10 z-10 px-4 sm:px-6 lg:px-10 py-6 w-full max-w-full">
           {selectedDept === 'library' ? (
             <div className="space-y-6">
-              
-              {/* Library On-Page Operations Switcher Hub */}
-              <div className="p-6 bg-white/65 dark:bg-zinc-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-zinc-800/40 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookOpen className={`w-6 h-6 ${currentPreset.accentText}`} />
-                    <span>Library Operations Hub</span>
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                    {currentCollege?.name || 'Central Campus Library'} • Dynamic database, live search & logs
-                  </p>
-                </div>
-
-                {/* Status Badge with Active Role */}
-                <div className="flex items-center gap-2 self-start md:self-auto bg-slate-500/5 px-3 py-1.5 rounded-xl border border-slate-200/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                    Role: <span className={`${currentPreset.accentText} uppercase tracking-wider`}>{authUser?.role || 'Guest Student'}</span>
-                  </span>
-                </div>
-              </div>
 
               {/* Render Active Subsection */}
               <div className="pt-2">
@@ -188,6 +196,15 @@ function AppContent({
                     setActiveTab={setAdminTab}
                     onLogout={handleLogout}
                     authUser={authUser}
+                    onOpenQRModal={() => {
+                      setScannerModalTab('qr');
+                      setIsQRModalOpen(true);
+                    }}
+                    onOpenBarcodeModal={() => {
+                      setScannerModalTab('barcode');
+                      setIsQRModalOpen(true);
+                    }}
+                    onClearCatalog={handleClearCatalog}
                   />
                 )}
               </div>
@@ -226,11 +243,40 @@ export default function App() {
   const [colleges, setColleges] = useState<College[]>([]);
   const [currentCollege, setCurrentCollege] = useState<College | null>(null);
   
-  // Auth & View State
-  const [authUser, setAuthUser] = useState<{ name: string; email: string; collegeId: string; role: string; selectedDept?: string } | null>(null);
-  const [selectedDept, setSelectedDept] = useState<string>('library');
-  const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
-  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
+  // Auth & View State (Persisted in localStorage across reloads/updates)
+  const [authUser, setAuthUser] = useState<{ name: string; email: string; collegeId: string; role: string; selectedDept?: string } | null>(() => {
+    const saved = localStorage.getItem('smart_cms_auth_user');
+    return saved ? JSON.parse(saved) : { name: 'Amit Verma', email: 'amit.verma@gmail.com', collegeId: 'col-gec-goa', role: 'Librarian', selectedDept: 'library' };
+  });
+  const [selectedDept, setSelectedDept] = useState<string>(() => {
+    return localStorage.getItem('smart_cms_selected_dept') || 'library';
+  });
+  const [activeView, setActiveView] = useState<'public' | 'admin'>(() => {
+    return (localStorage.getItem('smart_cms_active_view') as 'public' | 'admin') || 'admin';
+  });
+  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>(() => {
+    return (localStorage.getItem('smart_cms_admin_tab') as any) || 'add';
+  });
+
+  useEffect(() => {
+    if (authUser) {
+      localStorage.setItem('smart_cms_auth_user', JSON.stringify(authUser));
+    } else {
+      localStorage.removeItem('smart_cms_auth_user');
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    localStorage.setItem('smart_cms_selected_dept', selectedDept);
+  }, [selectedDept]);
+
+  useEffect(() => {
+    localStorage.setItem('smart_cms_active_view', activeView);
+  }, [activeView]);
+
+  useEffect(() => {
+    localStorage.setItem('smart_cms_admin_tab', adminTab);
+  }, [adminTab]);
   
   // Modal States
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -381,6 +427,25 @@ export default function App() {
     }
   };
 
+  const handleClearCatalog = async () => {
+    if (!currentCollege) return;
+    try {
+      const res = await fetch(`/api/books/college/${currentCollege.id}/clear`, { method: 'DELETE' });
+      if (res.ok) {
+        setBooks([]);
+        localStorage.removeItem('library_detected_form_schema');
+        fetchAdminStats(currentCollege.id);
+        return true;
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to clear catalog sheet from server.');
+      }
+    } catch (err) {
+      console.error('Error clearing catalog:', err);
+      throw err;
+    }
+  };
+
   const handleUpdateCollege = async (updatedCollegeData: Partial<College>) => {
     if (!currentCollege) return;
     try {
@@ -463,6 +528,7 @@ export default function App() {
         fetchAdminStats={fetchAdminStats}
         departments={departments}
         handleUpdateCollege={handleUpdateCollege}
+        handleClearCatalog={handleClearCatalog}
         
         // Custom props
         selectedDept={selectedDept}

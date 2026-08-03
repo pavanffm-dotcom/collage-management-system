@@ -1,5 +1,27 @@
 import React, { useState } from 'react';
-import { Building2, Save, MapPin, Mail, Sparkles, CheckCircle2, Edit3, Palette, Check, X, ChevronRight, SlidersHorizontal, LogOut } from 'lucide-react';
+import { 
+  Building2, 
+  Save, 
+  MapPin, 
+  Mail, 
+  Sparkles, 
+  CheckCircle2, 
+  Edit3, 
+  Palette, 
+  Check, 
+  X, 
+  ChevronRight, 
+  SlidersHorizontal, 
+  LogOut,
+  RefreshCw,
+  BarChart2,
+  Users,
+  QrCode,
+  Barcode,
+  BookOpen,
+  PlusCircle,
+  Layers
+} from 'lucide-react';
 import { College } from '../types';
 import { useTheme, THEME_PRESETS, ColorTheme } from '../context/ThemeContext';
 
@@ -7,12 +29,18 @@ interface SettingsViewProps {
   currentCollege: College | null;
   onUpdateCollege: (updatedCollege: Partial<College>) => Promise<void>;
   onLogout?: () => void;
+  onSelectTab?: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => void;
+  onOpenQRModal?: () => void;
+  onOpenBarcodeModal?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   currentCollege,
   onUpdateCollege,
-  onLogout
+  onLogout,
+  onSelectTab,
+  onOpenQRModal,
+  onOpenBarcodeModal
 }) => {
   const { colorTheme, setColorTheme, currentPreset } = useTheme();
 
@@ -64,16 +92,112 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>Control Panel</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <span>System Settings & Configuration</span>
+            <span>System Settings & Operations</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Configure institution details and select custom glassmorphic color themes.
+            Access circulation, analytics, staff directory, entrance QR, and institution details.
           </p>
         </div>
 
         <span className={`text-xs font-mono font-bold px-3.5 py-1.5 rounded-full ${currentPreset.innerCardBg} text-slate-600 dark:text-slate-300 border ${currentPreset.borderColor}`}>
           ID: {currentCollege?.id || 'col-gec-goa'}
         </span>
+      </div>
+
+      {/* Library Modules Quick Access Panel (Crucial for Mobile & Tablet access) */}
+      <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <Layers className="w-4 h-4 text-indigo-500" />
+            <span>Library Operations & Module Shortcuts</span>
+          </h3>
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+            Quick Navigation
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {/* Circulation Desk */}
+          <button
+            type="button"
+            onClick={() => onSelectTab && onSelectTab('circulation')}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+          >
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <RefreshCw className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Circulation</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Issue & Return</span>
+            </div>
+          </button>
+
+          {/* Analytics */}
+          <button
+            type="button"
+            onClick={() => onSelectTab && onSelectTab('analytics')}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-amber-950/50 border border-slate-200 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BarChart2 className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Analytics</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Reports & Stats</span>
+            </div>
+          </button>
+
+          {/* Directory */}
+          <button
+            type="button"
+            onClick={() => onSelectTab && onSelectTab('directory')}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Directory</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Staff & Faculty</span>
+            </div>
+          </button>
+
+          {/* Entrance Gate QR */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onSelectTab) onSelectTab('qr');
+              if (onOpenQRModal) onOpenQRModal();
+            }}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-purple-50 dark:hover:bg-purple-950/50 border border-slate-200 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+          >
+            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <QrCode className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Entrance QR</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Gate Scanner</span>
+            </div>
+          </button>
+
+          {/* Barcode & Shelf Mapper */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenBarcodeModal) onOpenBarcodeModal();
+              else if (onOpenQRModal) onOpenQRModal();
+            }}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95 col-span-2 sm:col-span-1"
+          >
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Barcode className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Barcode & Shelf</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Camera Mapper</span>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Main Settings Options Grid */}

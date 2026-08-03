@@ -1,0 +1,18 @@
+{
+  "short_name": "Smart CMS",
+  "name": "Smart College Management & Book Scanner",
+  "icons": [
+    {
+      "src": "pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090d16",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "description": "Library Book Scanner, Attendance & Smart College Management System"
+}
