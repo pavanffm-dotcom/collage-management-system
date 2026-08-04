@@ -8,7 +8,7 @@ import { QRModal } from './components/QRModal';
 import { BarcodeShelfMapperModal } from './components/BarcodeShelfMapperModal';
 import { ThemeModal } from './components/ThemeModal';
 import { HomePortal } from './components/HomePortal';
-import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode } from 'lucide-react';
+import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode, Lock } from 'lucide-react';
 
 // Departments View imports
 import { WorkInProgressView } from './components/WorkInProgressView';
@@ -41,15 +41,56 @@ function AppContent({
   departments,
   handleUpdateCollege,
   handleClearCatalog,
+  deferredPrompt,
   
   // Custom states passed to AppContent
   selectedDept,
   setSelectedDept,
-  handleHomeSignInSuccess
+  handleHomeSignInSuccess,
+  isPublicKioskMode,
+  setIsPublicKioskMode
 }: any) {
   const { currentPreset } = useTheme();
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [scannerModalTab, setScannerModalTab] = useState<'qr' | 'barcode'>('qr');
+
+  // PUBLIC KIOSK MODE: If active, render strictly the Smart AI Finder & Book catalog with ZERO admin headers, exit buttons, or tabs
+  if (isPublicKioskMode) {
+    return (
+      <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-500 relative overflow-hidden`}>
+        
+        {/* Ambient Theme Background Glow */}
+        <div className={`absolute top-0 inset-x-0 h-[480px] bg-gradient-to-b ${currentPreset.gradientBg} opacity-80 pointer-events-none blur-3xl transition-all duration-700`} />
+
+        {/* Floating Exit Kiosk button for admin testing */}
+        <div className="fixed top-3 right-3 z-50">
+          <button
+            onClick={() => {
+              setIsPublicKioskMode(false);
+              const url = new URL(window.location.href);
+              url.searchParams.delete('public');
+              url.searchParams.delete('kiosk');
+              window.history.replaceState({}, '', url.toString());
+            }}
+            className="px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white/90 border border-slate-700 text-[11px] font-bold backdrop-blur-md shadow-xl flex items-center gap-1.5 transition-all opacity-30 hover:opacity-100"
+            title="Exit Kiosk Mode"
+          >
+            <Lock className="w-3 h-3 text-emerald-400" />
+            <span>Exit Public Kiosk</span>
+          </button>
+        </div>
+
+        {/* Pure Student Catalog View - No Header, No Sidebar, No Bottom Nav Bar */}
+        <div className="flex-1 min-w-0 z-10 w-full pt-2">
+          <PublicStudentView
+            currentCollege={currentCollege}
+            colleges={colleges}
+            onSelectCollege={(col) => setCurrentCollege(col)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // If there's no logged-in student or faculty profile, display the Home Portal signup sheet
   if (!authUser) {
@@ -140,6 +181,7 @@ function AppContent({
         selectedDept={selectedDept}
         onSelectDept={setSelectedDept}
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        onOpenInstallModal={deferredPrompt ? () => deferredPrompt.prompt() : undefined}
       />
 
       {/* Theme Customization Modal */}
@@ -205,6 +247,12 @@ function AppContent({
                       setIsQRModalOpen(true);
                     }}
                     onClearCatalog={handleClearCatalog}
+                    onOpenPublicKiosk={() => {
+                      setIsPublicKioskMode(true);
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('public', 'true');
+                      window.history.replaceState({}, '', url.toString());
+                    }}
                   />
                 )}
               </div>
@@ -257,6 +305,23 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>(() => {
     return (localStorage.getItem('smart_cms_admin_tab') as any) || 'add';
   });
+  const [isPublicKioskMode, setIsPublicKioskMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('public') === 'true' || params.get('kiosk') === 'true';
+    }
+    return false;
+  });
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   useEffect(() => {
     if (authUser) {
@@ -529,11 +594,14 @@ export default function App() {
         departments={departments}
         handleUpdateCollege={handleUpdateCollege}
         handleClearCatalog={handleClearCatalog}
+        deferredPrompt={deferredPrompt}
         
         // Custom props
         selectedDept={selectedDept}
         setSelectedDept={setSelectedDept}
         handleHomeSignInSuccess={handleHomeSignInSuccess}
+        isPublicKioskMode={isPublicKioskMode}
+        setIsPublicKioskMode={setIsPublicKioskMode}
       />
     </ThemeProvider>
   );

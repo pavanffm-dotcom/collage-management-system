@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, MapPin, BookOpen, Layers, CheckCircle2, Share2, Printer, Tag, Calendar, Globe, Building2, Bookmark } from 'lucide-react';
 import { Book } from '../types';
 import { LibraryMap } from './LibraryMap';
+import { GrandWoodenAlmari } from './GrandWoodenAlmari';
 import { useTheme } from '../context/ThemeContext';
 import { motion } from 'motion/react';
 
@@ -146,43 +147,10 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialT
                   </div>
                 </div>
 
-                {/* Physical Location GPS Card */}
-                <div className={`sm:col-span-2 p-5 rounded-2xl border ${currentPreset.borderColor} bg-slate-50 dark:bg-slate-800/60 space-y-4 flex flex-col justify-between`}>
-                  
-                  <div>
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/80 pb-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <MapPin className={`w-5 h-5 ${currentPreset.accentText}`} />
-                        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                          Physical GPS Shelf Coordinates
-                        </h4>
-                      </div>
-                      <span className={`px-3 py-1 rounded-lg ${currentPreset.buttonBg} font-mono font-black text-sm tracking-widest shadow-xs`}>
-                        {book.location.shelfCode}
-                      </span>
-                    </div>
+                {/* Physical Location GPS Card with Grand Wooden Almari */}
+                <div className={`sm:col-span-2 space-y-3`}>
+                  <GrandWoodenAlmari book={book} onOpenMap={() => setActiveTab('map')} showDetailsBadge={true} />
 
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Almari Number</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{book.location.almariNumber}</span>
-                      </div>
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Row Number</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{book.location.rowNumber}</span>
-                      </div>
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Shelf Level</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{book.location.shelfPosition} Shelf</span>
-                      </div>
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Floor Wing</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{book.location.floorWing}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Button to Switch to Map Tab */}
                   <button
                     onClick={() => setActiveTab('map')}
                     className={`w-full py-2.5 px-4 ${currentPreset.buttonBg} font-bold text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all`}
@@ -190,7 +158,6 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({ book, initialT
                     <MapPin className="w-4 h-4 text-amber-300" />
                     <span>Open Interactive 2D Floor Plan</span>
                   </button>
-
                 </div>
 
               </div>

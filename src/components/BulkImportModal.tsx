@@ -51,6 +51,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   
   const [parsedBooks, setParsedBooks] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ processed: number; total: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<{ newCount: number; updatedCount: number; total: number } | null>(null);
 
@@ -133,15 +134,27 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     if (parsedBooks.length === 0) return;
     setIsImporting(true);
     setErrorMsg(null);
+    setImportProgress({ processed: 0, total: parsedBooks.length });
 
     try {
-      const result: any = await onImportBooks(parsedBooks);
-      const newCount = result?.newCount ?? parsedBooks.length;
-      const updatedCount = result?.updatedCount ?? 0;
-      
+      const CHUNK_SIZE = 3000;
+      let totalNew = 0;
+      let totalUpdated = 0;
+
+      for (let i = 0; i < parsedBooks.length; i += CHUNK_SIZE) {
+        const chunk = parsedBooks.slice(i, i + CHUNK_SIZE);
+        const result: any = await onImportBooks(chunk);
+        
+        totalNew += result?.newCount ?? chunk.length;
+        totalUpdated += result?.updatedCount ?? 0;
+
+        const currentProcessed = Math.min(i + CHUNK_SIZE, parsedBooks.length);
+        setImportProgress({ processed: currentProcessed, total: parsedBooks.length });
+      }
+
       setImportSummary({
-        newCount,
-        updatedCount,
+        newCount: totalNew,
+        updatedCount: totalUpdated,
         total: parsedBooks.length
       });
       setStep('success');
@@ -150,6 +163,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       setErrorMsg(err.message || 'Failed to save imported books. Please try again.');
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -338,7 +352,22 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             )}
 
-            {/* Confirm & Import Button */}
+            {/* Progress Bar & Confirm Import Button */}
+            {isImporting && importProgress && (
+              <div className="space-y-2 p-3 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-900/40">
+                <div className="flex items-center justify-between text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                  <span>Processing Batch: {importProgress.processed.toLocaleString()} / {importProgress.total.toLocaleString()} rows</span>
+                  <span>{Math.round((importProgress.processed / importProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-indigo-200 dark:bg-indigo-900 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-600 dark:bg-indigo-400 transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.round((importProgress.processed / importProgress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleConfirmImport}
@@ -348,12 +377,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               {isImporting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Importing {parsedBooks.length} Rows with {rawHeaders.length} Exact Columns...</span>
+                  <span>Importing {parsedBooks.length.toLocaleString()} Rows with {rawHeaders.length} Exact Columns...</span>
                 </>
               ) : (
                 <>
                   <Database className="w-4.5 h-4.5" />
-                  <span>Import All {parsedBooks.length} Rows (Exact Sheet View)</span>
+                  <span>Import All {parsedBooks.length.toLocaleString()} Rows (Exact Sheet View)</span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </>
               )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode, Camera } from 'lucide-react';
+import { Search, Sparkles, BookOpen, Filter, X, CheckCircle2, AlertCircle, RefreshCw, QrCode, Camera, FileText, Zap, ExternalLink, Link2 } from 'lucide-react';
 import { Book, College, AISearchResult, AISearchResponse } from '../types';
 import { StudentShelfCard } from './StudentShelfCard';
 import { BookDetailModal } from './BookDetailModal';
@@ -43,12 +43,62 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   const [borrowingBook, setBorrowingBook] = useState<Book | null>(null);
   const [isDirectBorrowOpen, setIsDirectBorrowOpen] = useState(false);
 
+  // Quick Redirect Links (PYQ & Dynamic Event Link)
+  const [quickLinks, setQuickLinks] = useState<{
+    pyqUrl: string;
+    pyqTitle: string;
+    dynamicUrl: string;
+    dynamicTitle: string;
+    dynamicEnabled: boolean;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('gec_quick_redirect_links');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      pyqUrl: 'https://drive.google.com/drive/folders/sample_pyq_papers',
+      pyqTitle: 'Previous Year Question Papers',
+      dynamicUrl: 'https://college.edu/notices/exam-timetable',
+      dynamicTitle: 'Notice & Dynamic Event Link',
+      dynamicEnabled: true
+    };
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const saved = localStorage.getItem('gec_quick_redirect_links');
+        if (saved) setQuickLinks(JSON.parse(saved));
+      } catch (e) {}
+    };
+    window.addEventListener('gec_quick_links_updated', handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('gec_quick_links_updated', handleStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  // Student Pagination
+  const [studentPage, setStudentPage] = useState(1);
+  const STUDENT_PAGE_SIZE = 60;
+
+  useEffect(() => {
+    setStudentPage(1);
+  }, [exactQuery, selectedDept, onlyAvailable]);
+
+  const displayBooks = useMemo(() => {
+    return books.slice((studentPage - 1) * STUDENT_PAGE_SIZE, studentPage * STUDENT_PAGE_SIZE);
+  }, [books, studentPage]);
+
+  const totalStudentPages = Math.ceil(books.length / STUDENT_PAGE_SIZE) || 1;
+
   // Departments list for filter (Memoized to prevent recalculated overhead on every render)
   const departments = useMemo(() => {
     return Array.from(new Set(books.map(b => b.department))).filter(Boolean);
   }, [books]);
 
-  // Fetch catalog books when college changes
+  // Fetch catalog books when college changes (Does not force display until user searches)
   const fetchCollegeBooks = useCallback(async (collegeId: string) => {
     setIsSearching(true);
     try {
@@ -82,7 +132,8 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
           query: exactQuery,
           department: selectedDept,
           onlyAvailable,
-          collegeId: currentCollege.id
+          collegeId: currentCollege.id,
+          searchMappings: currentCollege.searchMappings
         })
       });
       const data = await res.json();
@@ -93,6 +144,16 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
       setIsSearching(false);
     }
   }, [currentCollege, exactQuery, selectedDept, onlyAvailable]);
+
+  // Debounced auto-run exact search ONLY when user types query
+  useEffect(() => {
+    if (!currentCollege || searchMode !== 'exact') return;
+    if (!exactQuery.trim()) return; // Keep default clean view without auto-populating default books/locations
+    const timer = setTimeout(() => {
+      handleExactSearch();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [exactQuery, selectedDept, onlyAvailable, currentCollege, searchMode, handleExactSearch]);
 
   // Run AI Search
   const handleAISearch = useCallback(async (queryToRun?: string) => {
@@ -109,7 +170,8 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: queryStr,
-          collegeId: currentCollege.id
+          collegeId: currentCollege.id,
+          searchMappings: currentCollege.searchMappings
         })
       });
 
@@ -321,6 +383,73 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* 🚀 QUICK STUDENT ACCESS & DYNAMIC REDIRECT LINKS SECTION */}
+            <div className="pt-4 border-t border-slate-200/40 dark:border-slate-800/60 space-y-3">
+              <div className="flex items-center justify-between text-left px-1">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Student Quick Links & Direct Access</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-500 font-mono">
+                  Live Redirect
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Previous Year Question Papers (PYQ) Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetUrl = quickLinks.pyqUrl || 'https://drive.google.com';
+                    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className={`p-3.5 rounded-2xl border ${currentPreset.cardBorder} hover:border-indigo-500 dark:hover:border-indigo-400 bg-white/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {quickLinks.pyqTitle || 'Previous Year Question Papers'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                        Direct Access to PYQ Bank
+                      </span>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                </button>
+
+                {/* 2. Dynamic Event / Temporary Notice Link Button */}
+                {quickLinks.dynamicEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetUrl = quickLinks.dynamicUrl || 'https://college.edu';
+                      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className={`p-3.5 rounded-2xl border ${currentPreset.cardBorder} hover:border-amber-500 dark:hover:border-amber-400 bg-white/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                          {quickLinks.dynamicTitle || 'Notice & Dynamic Link'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                          Temporary Event & Notice Link
+                        </span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
         </motion.div>
@@ -328,85 +457,26 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
         {/* Results Section */}
         <div className="space-y-6">
           
-          {!hasSearched ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`py-12 px-6 text-center ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} space-y-4 shadow-lg`}
-            >
-              <div className="w-16 h-16 bg-amber-500/20 border border-amber-500/40 rounded-full flex items-center justify-center mx-auto text-amber-500 shadow-inner">
-                <QrCode className="w-8 h-8 animate-pulse" />
-              </div>
-              <div className="space-y-2 max-w-lg mx-auto">
-                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
-                  Ready to Locate & Borrow Books
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-                  Search for any book by title or describe your topic above (or click a sample tag) to find its exact shelf position, blinking red light guide, and scan your student ID barcode to take it home or to the reading room.
-                </p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 pt-2">
-                {[
-                  'Fish Curry of Goa',
-                  'Python Beginners',
-                  'Organic Chemistry',
-                  'Java Interview',
-                  'Indian Constitution'
-                ].map((sample, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setAiQuery(sample);
-                      handleAISearch(sample);
-                    }}
-                    className={`text-xs px-3.5 py-1.5 rounded-full ${currentPreset.secondaryButtonBg} border ${currentPreset.borderColor} font-medium hover:scale-105 transition-all shadow-xs`}
-                  >
-                    🔍 "{sample}"
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          ) : (
+          {hasSearched && (
             <>
-              {/* Header showing result count or scope message */}
+              {/* Header showing short result count text as requested */}
               <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
-                  <span>
-                    {searchMode === 'exact'
-                      ? 'Search Results'
-                      : `AI Search Results for "${aiQuery}"`}
-                  </span>
+                  {searchMode === 'exact' ? (
+                    <span>
+                      Showing Results {exactQuery.trim() ? `for "${exactQuery}"` : ''}
+                    </span>
+                  ) : (
+                    <span>
+                      Show Matching {aiQuery.trim() ? `for "${aiQuery}"` : ''}
+                    </span>
+                  )}
                 </h3>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${currentPreset.badgeBg}`}>
-                  {searchMode === 'exact' ? `${books.length} Books` : `${aiResults.length} Matched`}
+                <span className="text-xs font-black px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono">
+                  {searchMode === 'exact' ? `(${books.length})` : `(${aiResults.length})`}
                 </span>
               </div>
-
-          {/* AI Concept Badges */}
-          {searchMode === 'ai' && extractedConcepts.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`flex items-center gap-2 flex-wrap p-3 rounded-2xl ${currentPreset.badgeBg}`}
-            >
-              <span className="text-xs font-bold flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                AI Understood Concepts:
-              </span>
-              {extractedConcepts.map((concept, idx) => (
-                <motion.span
-                  key={idx}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${currentPreset.innerCardBg} text-slate-800 dark:text-slate-200 border ${currentPreset.borderColor} shadow-xs`}
-                >
-                  {concept}
-                </motion.span>
-              ))}
-            </motion.div>
-          )}
 
           {/* Content Listing with Staggered Animations */}
           <AnimatePresence mode="wait">
@@ -425,37 +495,48 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
               </motion.div>
             ) : searchMode === 'exact' ? (
               books.length > 0 ? (
-                <motion.div 
-                  key="books-list"
-                  initial="hidden"
-                  animate="visible"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    visible: {
-                      opacity: 1,
-                      transition: {
-                        staggerChildren: 0.05
-                      }
-                    }
-                  }}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                >
-                  {books.map(book => (
-                    <motion.div
-                      key={book.id}
-                      variants={{
-                        hidden: { opacity: 0, y: 15 },
-                        visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
-                      }}
-                    >
-                      <StudentShelfCard
-                        book={book}
-                        onSelectBook={setSelectedBook}
-                        onBorrow={setBorrowingBook}
-                      />
-                    </motion.div>
-                  ))}
-                </motion.div>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 px-1">
+                    <span>Showing {Math.min((studentPage - 1) * STUDENT_PAGE_SIZE + 1, books.length)}–{Math.min(studentPage * STUDENT_PAGE_SIZE, books.length)} of {books.length.toLocaleString()} catalog books</span>
+                    <span>Page {studentPage} of {totalStudentPages}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {displayBooks.map(book => (
+                      <div key={book.id}>
+                        <StudentShelfCard
+                          book={book}
+                          onSelectBook={setSelectedBook}
+                          onBorrow={setBorrowingBook}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {totalStudentPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 pt-4">
+                      <button
+                        type="button"
+                        disabled={studentPage === 1}
+                        onClick={() => setStudentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        ← Previous Page
+                      </button>
+                      <span className="text-xs font-mono font-extrabold text-slate-700 dark:text-slate-300">
+                        {studentPage} / {totalStudentPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={studentPage >= totalStudentPages}
+                        onClick={() => setStudentPage(prev => Math.min(prev + 1, totalStudentPages))}
+                        className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next Page →
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <motion.div 
                   key="no-books"

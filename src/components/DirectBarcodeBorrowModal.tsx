@@ -53,11 +53,14 @@ export const DirectBarcodeBorrowModal: React.FC<DirectBarcodeBorrowModalProps> =
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState(false);
 
+  const [successScanFeedback, setSuccessScanFeedback] = useState<string | null>(null);
+
   // Start live camera stream
   const startCamera = async (type: 'book' | 'student') => {
     setActiveScanType(type);
     setCameraError(false);
     setErrorMsg('');
+    setSuccessScanFeedback(null);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
@@ -88,44 +91,134 @@ export const DirectBarcodeBorrowModal: React.FC<DirectBarcodeBorrowModalProps> =
     };
   }, [stream]);
 
-  // Handle capture / scan success from camera view
-  const handleCaptureScan = () => {
-    if (activeScanType === 'book') {
-      const sampleBooks = college.books || [];
-      if (sampleBooks.length > 0) {
-        const randomBook = sampleBooks[Math.floor(Math.random() * sampleBooks.length)];
-        setBookBarcode(randomBook.accessionNumber || randomBook.id);
-        setMatchedBook(randomBook);
-      } else {
-        const code = `ACC-${Math.floor(100000 + Math.random() * 900000)}`;
+  const playBeepSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1046.5, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    } catch (e) {
+      console.warn('Audio feedback error:', e);
+    }
+  };
+
+  const processDetectedBarcode = (code: string) => {
+    if (successScanFeedback) return; // Prevent duplicate triggers
+    playBeepSound();
+    setSuccessScanFeedback(code);
+
+    setTimeout(() => {
+      if (activeScanType === 'book') {
         setBookBarcode(code);
-        setMatchedBook({
-          id: code,
-          title: 'Scanned Library Book',
-          author: 'College Faculty Author',
-          isbn: '978-81-203-0000-0',
-          accessionNumber: code,
-          callNumber: '005.13 GOV',
-          department: 'General Engineering',
-          totalCopies: 4,
-          availableCopies: 3,
-          availability: 'Available',
-          location: {
-            almariNumber: 'Almari 2',
-            rowNumber: 'Row 1',
-            shelfPosition: 'Top Shelf',
-            shelfCode: 'A2-R1-T'
-          }
-        });
+        // Find if any book in college database matches this barcode or accessionNumber or ISBN
+        const found = (college.books || []).find(b => 
+          (b.accessionNumber || '').toLowerCase() === code.toLowerCase() ||
+          (b.isbn || '').toLowerCase() === code.toLowerCase() ||
+          b.id.toLowerCase() === code.toLowerCase()
+        );
+        if (found) {
+          setMatchedBook(found);
+        } else {
+          // Set exact scanned barcode details without inventing fake titles
+          setMatchedBook({
+            id: code,
+            title: `Scanned Barcode: ${code}`,
+            author: 'Library Item',
+            isbn: code,
+            accessionNumber: code,
+            callNumber: 'General',
+            department: 'General Engineering',
+            totalCopies: 1,
+            availableCopies: 1,
+            availability: 'Available',
+            location: {
+              almariNumber: 'Almari 1',
+              rowNumber: 'Row 1',
+              shelfPosition: 'Center' as any,
+              shelfCode: 'A1-R1-C'
+            }
+          });
+        }
+      } else if (activeScanType === 'student') {
+        setStudentId(code);
+        // Do NOT auto-fill fake student name; student will type their real name manually
       }
-    } else if (activeScanType === 'student') {
-      const demoId = `GEC-2024-${Math.floor(100 + Math.random() * 899)}`;
-      setStudentId(demoId);
-      if (!studentName) {
-        setStudentName('Student ' + Math.floor(10 + Math.random() * 90));
+      setSuccessScanFeedback(null);
+      stopCamera();
+    }, 900);
+  };
+
+  // Continuous Native BarcodeDetector loop for instant auto-detection
+  useEffect(() => {
+    let intervalId: any = null;
+
+    if (stream && activeScanType && videoRef.current && !successScanFeedback) {
+      if ('BarcodeDetector' in window) {
+        try {
+          const detector = new (window as any).BarcodeDetector({
+            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'aztec', 'pdf417']
+          });
+
+          intervalId = setInterval(async () => {
+            if (videoRef.current && videoRef.current.readyState === 4 && !successScanFeedback) {
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes && barcodes.length > 0) {
+                  const detectedCode = barcodes[0].rawValue;
+                  if (detectedCode && detectedCode.trim()) {
+                    processDetectedBarcode(detectedCode.trim());
+                  }
+                }
+              } catch (e) {
+                // Frame read fallback
+              }
+            }
+          }, 180);
+        } catch (e) {
+          // Detector fallback
+        }
       }
     }
-    stopCamera();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [stream, activeScanType, successScanFeedback]);
+
+  // Handle capture / scan from camera view on manual capture button click
+  const handleCaptureScan = async () => {
+    setErrorMsg('');
+    let detectedCode = '';
+    
+    // Try real detection from current video frame
+    if (videoRef.current && 'BarcodeDetector' in window) {
+      try {
+        const detector = new (window as any).BarcodeDetector({
+          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'aztec', 'pdf417']
+        });
+        const barcodes = await detector.detect(videoRef.current);
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          detectedCode = barcodes[0].rawValue.trim();
+        }
+      } catch (err) {
+        console.warn('Manual capture barcode detection error:', err);
+      }
+    }
+
+    if (detectedCode) {
+      processDetectedBarcode(detectedCode);
+      return;
+    }
+
+    // If NO barcode was detected in view, notify the user instead of inventing fake numbers
+    setErrorMsg('No barcode detected in camera view. Please align the physical barcode clearly inside the red line or enter it manually.');
   };
 
   const handleSubmitBorrow = (e: React.FormEvent) => {
@@ -297,6 +390,21 @@ export const DirectBarcodeBorrowModal: React.FC<DirectBarcodeBorrowModalProps> =
                   📷 Align {activeScanType === 'book' ? 'Book Barcode' : 'Student ID Card'} in View
                 </div>
 
+                {/* Animated Scan Success Checkmark Overlay */}
+                {successScanFeedback && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="absolute inset-0 bg-emerald-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10"
+                  >
+                    <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-2 shadow-lg shadow-emerald-500/50">
+                      <CheckCircle2 className="w-10 h-10 animate-bounce" />
+                    </div>
+                    <p className="text-sm font-bold text-white">Scanned Successfully!</p>
+                    <p className="text-[11px] font-mono text-emerald-300 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/30 mt-1 max-w-[90%] truncate">{successScanFeedback}</p>
+                  </motion.div>
+                )}
+
                 {cameraError && (
                   <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-4 text-center space-y-2">
                     <p className="text-xs text-amber-400">Camera permission denied or unavailable on this device.</p>
@@ -388,21 +496,28 @@ export const DirectBarcodeBorrowModal: React.FC<DirectBarcodeBorrowModalProps> =
                         <span>Scan Camera</span>
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      required={!matchedBook}
-                      value={bookBarcode}
-                      onChange={e => {
-                        setBookBarcode(e.target.value);
-                        const found = college.books?.find(b => 
-                          b.accessionNumber?.toLowerCase() === e.target.value.toLowerCase() || 
-                          b.id.toLowerCase() === e.target.value.toLowerCase()
-                        );
-                        setMatchedBook(found || null);
-                      }}
-                      placeholder="e.g. ACC-2026-001 or scan barcode"
-                      className={`w-full px-3 py-2 rounded-xl border ${currentPreset.borderColor} ${currentPreset.innerCardBg} text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white`}
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required={!matchedBook}
+                        value={bookBarcode}
+                        onChange={e => {
+                          setBookBarcode(e.target.value);
+                          const found = college.books?.find(b => 
+                            b.accessionNumber?.toLowerCase() === e.target.value.toLowerCase() || 
+                            b.id.toLowerCase() === e.target.value.toLowerCase()
+                          );
+                          setMatchedBook(found || null);
+                        }}
+                        placeholder="e.g. ACC-2026-001 or scan barcode"
+                        className={`w-full pl-3 pr-9 py-2 rounded-xl border ${currentPreset.borderColor} ${currentPreset.innerCardBg} text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white`}
+                      />
+                      {bookBarcode && (
+                        <div className="absolute right-3 top-2.5 flex items-center gap-1 text-emerald-500" title="Scanned Successfully">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   /* Mode: Book Name Search */
@@ -518,14 +633,21 @@ export const DirectBarcodeBorrowModal: React.FC<DirectBarcodeBorrowModalProps> =
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={studentId}
-                    onChange={e => setStudentId(e.target.value)}
-                    placeholder="Roll ID (e.g. GEC-045)"
-                    className={`w-full px-3 py-2 rounded-xl border ${currentPreset.borderColor} ${currentPreset.innerCardBg} text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white`}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={studentId}
+                      onChange={e => setStudentId(e.target.value)}
+                      placeholder="Roll ID (e.g. GEC-045)"
+                      className={`w-full pl-3 pr-9 py-2 rounded-xl border ${currentPreset.borderColor} ${currentPreset.innerCardBg} text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white`}
+                    />
+                    {studentId && (
+                      <div className="absolute right-3 top-2.5 flex items-center gap-1 text-emerald-500" title="Scanned Successfully">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required

@@ -1,5 +1,11 @@
 export type ShelfPosition = 'Top' | 'Middle' | 'Bottom' | 'LEFT' | 'MIDDLE' | 'RIGHT' | 'Left' | 'Right';
 
+export interface SearchColumnMapping {
+  nameColumns: string[];   // Catalog/sheet columns connected to "Search by Book Name"
+  aiColumns: string[];     // Catalog/sheet columns connected to "Search with AI"
+  autoConnectMatchedHeaders?: boolean;
+}
+
 export interface College {
   id: string;          // e.g. "col-gec-goa"
   name: string;        // e.g. "Goa Engineering College"
@@ -8,6 +14,7 @@ export interface College {
   librarianName: string;
   email: string;
   qrCodeUrl?: string;
+  searchMappings?: SearchColumnMapping;
 }
 
 export interface ShelfLocation {

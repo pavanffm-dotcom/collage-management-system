@@ -85,6 +85,23 @@
   --theme-badge-dark-text: #fecdd3;
 }
 
+[data-color-theme="blueprint3d"] {
+  --theme-primary: #5865f2;
+  --theme-primary-hover: #4f46e5;
+  --theme-primary-light: #eef2ff;
+  --theme-primary-dark-bg: rgba(88, 101, 242, 0.35);
+  --theme-primary-border: rgba(88, 101, 242, 0.45);
+  --theme-primary-text: #5865f2;
+  --theme-primary-dark-text: #818cf8;
+  --theme-gradient-from: #5865f2;
+  --theme-gradient-to: #06b6d4;
+  --theme-glow: 0 15px 35px -5px rgba(88, 101, 242, 0.5);
+  --theme-badge-bg: #eef2ff;
+  --theme-badge-text: #3730a3;
+  --theme-badge-dark-bg: rgba(88, 101, 242, 0.3);
+  --theme-badge-dark-text: #c7d2fe;
+}
+
 /* Custom Dynamic Theme Utilities */
 .bg-theme-primary {
   background-color: var(--theme-primary) !important;

@@ -258,42 +258,118 @@ export function convertExactRawRowsToBooks(rows: Record<string, string>[]): any[
     const rawCsvData = { ...row };
     const customAttributes = { ...row };
 
-    // Identify candidate title and author keys from row without forcing hardcoded mappings
-    const titleKey = Object.keys(row).find(k => {
-      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return norm.includes('title') || norm.includes('book') || norm.includes('item') || norm === 'name';
-    }) || Object.keys(row)[0];
+    const keys = Object.keys(row);
 
-    const authorKey = Object.keys(row).find(k => {
+    const isIdKey = (k: string) => {
       const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return norm.includes('author') || norm.includes('contributor') || norm.includes('writer') || norm.includes('creator');
-    }) || Object.keys(row)[1];
+      return norm.includes('id') || norm.includes('code') || norm.includes('acc') || norm.includes('number') || norm.includes('num') || norm.includes('barcode') || norm.includes('isbn');
+    };
+
+    // Find best title key without picking ID columns like Book_ID
+    let titleKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (isIdKey(k)) return false;
+      return norm === 'title' || norm === 'booktitle' || norm === 'titleofbook' || norm === 'bookname' || norm === 'name' || norm === 'itemname' || norm === 'subject' || norm === 'particulars' || norm === 'details' || norm === 'document' || norm === 'book';
+    });
+
+    if (!titleKey) {
+      titleKey = keys.find(k => {
+        const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (isIdKey(k)) return false;
+        return norm.includes('title') || norm.includes('name') || norm.includes('particular') || norm.includes('detail') || norm.includes('book');
+      });
+    }
+
+    if (!titleKey) {
+      titleKey = keys.find(k => !isIdKey(k)) || keys[0];
+    }
+
+    // Find best author key
+    const authorKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('author') || norm.includes('writer') || norm.includes('contributor') || norm.includes('creator') || norm.includes('pengarang') || norm === 'by';
+    });
 
     const title = (titleKey && row[titleKey] && row[titleKey].trim()) 
       ? row[titleKey].trim() 
-      : (Object.values(row).find(v => v && v.trim().length > 0) || `Record #${idx + 1}`);
+      : (Object.values(row).find(v => v && v.trim().length > 0 && !isIdKey(v)) || `Record #${idx + 1}`);
 
     const author = (authorKey && row[authorKey] && row[authorKey].trim()) 
       ? row[authorKey].trim() 
-      : '';
+      : (row['Author'] || row['author'] || row['Author(s)'] || '');
+
+    // Flexible Accession Number lookup
+    const accKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('accession') || norm.includes('bookid') || norm.includes('accno') || norm.includes('register') || norm === 'id' || norm === 'otlid' || norm === 'assetid';
+    });
+    const accessionNumber = (accKey && row[accKey] && row[accKey].trim())
+      ? row[accKey].trim()
+      : (row['Book_ID'] || row['Book ID'] || row['Accession Number'] || row['Accession No'] || `ACC-${idx + 1001}`);
+
+    // Flexible Department lookup
+    const deptKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('department') || norm.includes('dept') || norm.includes('branch') || norm.includes('stream') || norm.includes('discipline');
+    });
+    const department = (deptKey && row[deptKey] && row[deptKey].trim())
+      ? row[deptKey].trim()
+      : (row['Department'] || row['Branch'] || row['Subject'] || 'General');
+
+    // Flexible Subject lookup
+    const subjKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('subject') || norm.includes('topic') || norm.includes('category');
+    });
+    const subject = (subjKey && row[subjKey] && row[subjKey].trim())
+      ? row[subjKey].trim()
+      : department;
+
+    // Flexible Almari/Rack lookup
+    const almariKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('almari') || norm.includes('rack') || norm.includes('cupboard') || norm.includes('cabinet') || norm.includes('location');
+    });
+    const almari = (almariKey && row[almariKey] && row[almariKey].trim()) ? row[almariKey].trim() : 'A1';
+
+    // Flexible Row lookup
+    const rowKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm === 'row' || norm.includes('tier') || norm.includes('shelfrow') || norm === 'level';
+    });
+    const rowNum = (rowKey && row[rowKey] && row[rowKey].trim()) ? row[rowKey].trim() : 'R1';
+
+    // Flexible Publisher lookup
+    const pubKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('publisher') || norm.includes('press') || norm.includes('house');
+    });
+    const publisher = (pubKey && row[pubKey] && row[pubKey].trim()) ? row[pubKey].trim() : (row['Publisher'] || '');
+
+    // Flexible Description lookup
+    const descKey = keys.find(k => {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return norm.includes('description') || norm.includes('desc') || norm.includes('summary') || norm.includes('notes') || norm.includes('remarks');
+    });
+    const description = (descKey && row[descKey] && row[descKey].trim()) ? row[descKey].trim() : '';
 
     return {
       id: `book-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
       title,
       author,
-      accessionNumber: row['Accession Number'] || row['Accession No'] || row['Accession / Register No'] || row['Otl id'] || row['OTL ID'] || row['otl_id'] || row['id'] || `ACC-${idx + 1001}`,
+      accessionNumber,
       isbn: row['ISBN'] || row['Isbn'] || row['Barcode'] || '',
-      department: row['Department'] || row['Branch'] || row['Subject'] || '',
-      subject: row['Subject'] || row['Department'] || '',
-      almari: row['Almari'] || row['Rack'] || '',
-      row: row['Row'] || '',
-      position: row['Position'] || '',
+      department,
+      subject,
+      almari,
+      row: rowNum,
+      position: row['Position'] || 'Middle',
       copies: 1,
       totalCopies: 1,
       availableCopies: 1,
-      publisher: row['Publisher'] || row['Press'] || '',
+      publisher,
       callNumber: row['Call Number'] || row['CallNumber'] || '',
-      description: row['Description'] || row['Notes'] || '',
+      description,
       publicationYear: Number(row['Publication Year'] || row['Copyright Year'] || row['Year']) || new Date().getFullYear(),
       customAttributes,
       rawCsvData

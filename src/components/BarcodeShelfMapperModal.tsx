@@ -123,7 +123,7 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
       if ('BarcodeDetector' in window) {
         try {
           const detector = new (window as any).BarcodeDetector({
-            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e']
+            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'aztec', 'pdf417']
           });
 
           intervalId = setInterval(async () => {
@@ -132,16 +132,17 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
                 const barcodes = await detector.detect(videoRef.current);
                 if (barcodes && barcodes.length > 0) {
                   const detectedCode = barcodes[0].rawValue;
-                  if (detectedCode && detectedCode !== scannedBarcode) {
-                    setScannedBarcode(detectedCode);
-                    handleBarcodeSearch(detectedCode);
+                  if (detectedCode && detectedCode.trim() && detectedCode !== scannedBarcode) {
+                    playBeepSound();
+                    setScannedBarcode(detectedCode.trim());
+                    handleBarcodeSearch(detectedCode.trim());
                   }
                 }
               } catch (e) {
                 // frame read fallback
               }
             }
-          }, 400);
+          }, 180);
         } catch (e) {
           // detector format fallback
         }
@@ -440,21 +441,38 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
                       </div>
                     </div>
 
-                    {/* Instant Test Snap Button overlay */}
+                    {/* Instant Snap Barcode Button overlay */}
                     <div className="absolute bottom-2 right-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (books.length > 0) {
-                            const randomBook = books[Math.floor(Math.random() * books.length)];
-                            const code = randomBook.accessionNumber || randomBook.isbn || randomBook.title;
-                            handleSelectBook(randomBook);
+                        onClick={async () => {
+                          let detectedCode = '';
+                          if (videoRef.current && 'BarcodeDetector' in window) {
+                            try {
+                              const detector = new (window as any).BarcodeDetector({
+                                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'aztec', 'pdf417']
+                              });
+                              const barcodes = await detector.detect(videoRef.current);
+                              if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                                detectedCode = barcodes[0].rawValue.trim();
+                              }
+                            } catch (err) {
+                              console.warn('Snap barcode error:', err);
+                            }
+                          }
+                          if (detectedCode) {
+                            playBeepSound();
+                            setScannedBarcode(detectedCode);
+                            handleBarcodeSearch(detectedCode);
+                          } else {
+                            setToastMessage('No barcode detected in camera frame. Align barcode inside viewfinder or type title below.');
+                            setTimeout(() => setToastMessage(null), 3000);
                           }
                         }}
-                        className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-[10px] flex items-center gap-1 shadow-md active:scale-95"
+                        className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-lg text-[10px] flex items-center gap-1 shadow-md active:scale-95"
                       >
                         <Zap className="w-3 h-3 fill-current" />
-                        <span>Snap Code</span>
+                        <span>Detect Barcode</span>
                       </button>
                     </div>
                   </div>

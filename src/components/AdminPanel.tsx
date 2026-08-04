@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Shield, Plus, Edit2, Trash2, Sparkles, RefreshCw, CheckCircle2, X, Search, BarChart2, QrCode, Settings, BookOpen, Building2, Printer, Copy, Check, FileSpreadsheet, Upload, Download, Users, ArrowLeftRight, Clock, HelpCircle, Coins, User, Sliders, RotateCcw, Layers, FileCode, Table, LayoutGrid, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Minimize2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Book, College, LibraryStats, IssuedBook } from '../types';
 import { AnalyticsView } from './AnalyticsView';
@@ -29,6 +29,7 @@ interface AdminPanelProps {
   onOpenQRModal?: () => void;
   onOpenBarcodeModal?: () => void;
   onClearCatalog?: () => Promise<void>;
+  onOpenPublicKiosk?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -49,13 +50,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   authUser,
   onOpenQRModal,
   onOpenBarcodeModal,
-  onClearCatalog
+  onClearCatalog,
+  onOpenPublicKiosk
 }) => {
   const { currentPreset } = useTheme();
   const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = propSetActiveTab || setLocalActiveTab;
   const [searchFilter, setSearchFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchFilter]);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
@@ -235,6 +243,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [toast]);
 
+  // Table View Mode: 'sheet' (Exact Spreadsheet Columns Grid) vs 'standard' (Compact Card Catalog)
+  const [tableViewMode, setTableViewMode] = useState<'sheet' | 'standard'>('sheet');
+
+  // Global Keyboard listener for smooth horizontal scrolling in sheet view using Left/Right arrow keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab !== 'add' || tableViewMode !== 'sheet') return;
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        return; // Do not intercept arrow keys when typing inside input/textarea/select
+      }
+      if (e.key === 'ArrowLeft') {
+        if (tableScrollRef.current) {
+          tableScrollRef.current.scrollBy({ left: -320, behavior: 'smooth' });
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (tableScrollRef.current) {
+          tableScrollRef.current.scrollBy({ left: 320, behavior: 'smooth' });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, tableViewMode]);
+
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const scrollTable = (direction: 'left' | 'right') => {
@@ -243,9 +277,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       tableScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
-
-  // Table View Mode: 'sheet' (Exact Spreadsheet Columns Grid) vs 'standard' (Compact Card Catalog)
-  const [tableViewMode, setTableViewMode] = useState<'sheet' | 'standard'>('sheet');
 
   const getActiveTableColumns = (): string[] => {
     if (detectedCustomSchema && detectedCustomSchema.length > 0) {
@@ -609,11 +640,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const filteredBooks = books.filter(b => 
-    b.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    b.author.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    b.department.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  const filteredBooks = useMemo(() => {
+    if (!searchFilter.trim()) return books;
+    const query = searchFilter.toLowerCase().trim();
+    return books.filter(b => {
+      const title = (b.title || '').toLowerCase();
+      const author = (b.author || '').toLowerCase();
+      const dept = (b.department || '').toLowerCase();
+      const acc = (b.accessionNumber || '').toLowerCase();
+      const isbn = (b.isbn || '').toLowerCase();
+      const publisher = (b.publisher || '').toLowerCase();
+      const rawValues = Object.values(b.rawCsvData || {}).map(v => String(v).toLowerCase());
+
+      return (
+        title.includes(query) ||
+        author.includes(query) ||
+        dept.includes(query) ||
+        acc.includes(query) ||
+        isbn.includes(query) ||
+        publisher.includes(query) ||
+        rawValues.some(v => v.includes(query))
+      );
+    });
+  }, [books, searchFilter]);
+
+  const totalPages = Math.ceil(filteredBooks.length / pageSize) || 1;
+  const paginatedBooks = filteredBooks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6 pb-16">
@@ -630,51 +682,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             className="space-y-5"
           >
 
-          {/* Clean Excel / CSV Actions Bar */}
-          <div className={`${currentPreset.cardBg} ${currentPreset.cardRadius} p-4 border ${currentPreset.cardBorder} shadow-sm flex flex-wrap items-center justify-between gap-3`}>
-            <div className="flex items-center gap-2.5">
-              <div className={`w-9 h-9 ${currentPreset.badgeRadius} ${currentPreset.badgeBg} flex items-center justify-center shrink-0`}>
+          {/* Clean Excel / CSV Actions Bar - Mobile Redesigned */}
+          <div className={`${currentPreset.cardBg} ${currentPreset.cardRadius} p-3.5 sm:p-5 border ${currentPreset.cardBorder} shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 ${currentPreset.badgeRadius} ${currentPreset.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}>
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   Excel / CSV Catalog Actions
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
                   Import 10,000+ entries — all original columns & data rows preserved 100% as-is
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setIsBulkModalOpen(true)}
-                className={`px-3.5 py-1.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs shadow-xs transition-all flex items-center gap-1.5`}
+                className={`w-full sm:w-auto px-4 py-2.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98`}
                 title="Import or append new entries from Excel/CSV to catalog"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="w-4 h-4 shrink-0" />
                 <span>+ Upload / Append Spreadsheet</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => exportBooksToCSV(books, currentCollege?.name)}
-                className={`px-3 py-1.5 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} font-bold text-xs transition-all flex items-center gap-1.5`}
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Export Catalog CSV</span>
-              </button>
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => exportBooksToCSV(books, currentCollege?.name)}
+                  className={`w-full sm:w-auto px-3.5 py-2.5 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-98`}
+                >
+                  <Download className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>Export CSV</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={downloadSampleTemplateCSV}
-                className={`px-2.5 py-1.5 ${currentPreset.accentText} ${currentPreset.buttonRadius} hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-all flex items-center gap-1`}
-                title="Download formatted sample template"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Sample</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={downloadSampleTemplateCSV}
+                  className={`w-full sm:w-auto px-3 py-2.5 ${currentPreset.accentText} ${currentPreset.buttonRadius} hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-slate-200/50 dark:border-slate-700/50 active:scale-98`}
+                  title="Download formatted sample template"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>Sample</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -682,7 +736,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           
           {/* Add / Edit Book Form */}
           {isAddBookPanelOpen && (
-            <div className={`lg:col-span-1 ${currentPreset.cardBg} ${currentPreset.cardRadius} p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
+            <div className={`lg:col-span-1 ${currentPreset.cardBg} ${currentPreset.cardRadius} p-4 sm:p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
               
               {/* Form Header */}
               <div className={`flex items-center justify-between border-b ${currentPreset.borderColor} pb-3`}>
@@ -963,93 +1017,96 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
 
           {/* Book Catalog Table */}
-          <div className={`${isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3'} ${currentPreset.cardBg} rounded-3xl p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4 transition-all duration-300`}>
+          <div className={`${isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3'} ${currentPreset.cardBg} rounded-3xl p-3.5 sm:p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4 transition-all duration-300`}>
             
-            <div className={`flex flex-wrap items-center justify-between gap-3 border-b ${currentPreset.borderColor} pb-3`}>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 border-b border-slate-200 dark:border-slate-800 pb-3.5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full md:w-auto">
                 {!isAddBookPanelOpen && (
                   <button
                     type="button"
                     onClick={() => setIsAddBookPanelOpen(true)}
-                    className={`px-3 py-1.5 ${currentPreset.buttonBg} text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md hover:scale-105 transition-transform`}
+                    className={`w-full sm:w-auto px-3.5 py-2.5 ${currentPreset.buttonBg} text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md hover:scale-102 transition-transform active:scale-98`}
                     title="Re-open Add New Book Form Panel"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 shrink-0" />
                     <span>+ Add New Book</span>
                   </button>
                 )}
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookOpen className={`w-5 h-5 ${currentPreset.accentText}`} />
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <BookOpen className={`w-5 h-5 ${currentPreset.accentText} shrink-0`} />
                     <span>College Catalog ({books.length} Books)</span>
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
                     {currentCollege?.name} library database
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
                 {/* View Mode Toggle Buttons */}
-                <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => setTableViewMode('sheet')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       tableViewMode === 'sheet'
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Display exact rows and columns from Excel/CSV file"
                   >
-                    <Table className="w-3.5 h-3.5" />
-                    <span>Exact Sheet View ({getActiveTableColumns().length} Cols)</span>
+                    <Table className="w-3.5 h-3.5 shrink-0" />
+                    <span>Exact Sheet ({getActiveTableColumns().length} Cols)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTableViewMode('standard')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       tableViewMode === 'standard'
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Display compact standard catalog cards"
                   >
-                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
                     <span>Standard View</span>
                   </button>
                 </div>
 
-                <div className="relative flex items-center">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3" />
-                  <input
-                    type="text"
-                    value={searchFilter}
-                    onChange={e => setSearchFilter(e.target.value)}
-                    placeholder="Filter catalog..."
-                    className={`pl-9 pr-3 py-1.5 text-xs ${currentPreset.inputBg} rounded-xl`}
-                  />
-                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-48">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchFilter}
+                      onChange={e => setSearchFilter(e.target.value)}
+                      placeholder="Filter catalog..."
+                      className={`w-full pl-9 pr-3 py-2 text-xs ${currentPreset.inputBg} rounded-xl border border-slate-200/50 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                    />
+                  </div>
 
-                {onClearCatalog && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowClearSheetModal(true);
-                      setDeleteConfirmInput('');
-                    }}
-                    disabled={isClearing}
-                    className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
-                    title="Delete full sheet / clear all books in catalog"
-                  >
-                    {isClearing ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                    <span>{isClearing ? 'Deleting...' : 'Delete Full Sheet'}</span>
-                  </button>
-                )}
+                  {onClearCatalog && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowClearSheetModal(true);
+                        setDeleteConfirmInput('');
+                      }}
+                      disabled={isClearing}
+                      className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs rounded-xl border border-rose-500/30 flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-50 shrink-0"
+                      title="Delete full sheet / clear all books in catalog"
+                    >
+                      {isClearing ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      <span className="hidden sm:inline">{isClearing ? 'Deleting...' : 'Delete Full Sheet'}</span>
+                      <span className="sm:hidden">{isClearing ? '...' : 'Clear Sheet'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1057,51 +1114,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               tableViewMode === 'sheet' ? (
                 /* EXACT SPREADSHEET GRID VIEW */
                 <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-1.5 py-1.5 font-medium bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-3 py-2 font-medium bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold">
                         <FileSpreadsheet className="w-4 h-4 shrink-0 text-indigo-500" />
-                        <span>Showing all {getActiveTableColumns().length} spreadsheet columns</span>
+                        <span>Showing all {getActiveTableColumns().length} columns</span>
                       </span>
-                      <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono px-2 py-0.5 rounded-full font-bold">
-                        Scroll horizontally →
+                      <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono px-2.5 py-0.5 rounded-full font-bold">
+                        Swipe or ◄ ► arrow keys to scroll
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* Smooth Horizontal Scroll Navigation Controls */}
-                      <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-                        <button
-                          type="button"
-                          onClick={() => scrollTable('left')}
-                          className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-200 transition-colors"
-                          title="Scroll columns left"
-                        >
-                          <ChevronLeft className="w-3.5 h-3.5" />
-                          <span>Left</span>
-                        </button>
-                        <div className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
-                        <button
-                          type="button"
-                          onClick={() => scrollTable('right')}
-                          className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-200 transition-colors"
-                          title="Scroll columns right"
-                        >
-                          <span>Right</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
                       {!isAddBookPanelOpen && (
                         <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
                           FULLSCREEN ACTIVE
                         </span>
                       )}
-                      <span className="font-mono text-slate-400">{filteredBooks.length} Rows</span>
+                      <span className="font-mono text-slate-400 font-bold">{filteredBooks.length} Rows</span>
                     </div>
                   </div>
 
-                  <div ref={tableScrollRef} className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner max-w-full scroll-smooth">
+                  <div ref={tableScrollRef} tabIndex={0} className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner max-w-full scroll-smooth focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
                     <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
                       <thead className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-extrabold uppercase tracking-wider text-[10px]">
                         <tr>
@@ -1128,10 +1162,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
-                        {filteredBooks.map((b, rowIdx) => (
+                        {paginatedBooks.map((b, rowIdx) => (
                           <tr key={b.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-colors">
                             <td className="py-2.5 px-2.5 border-r border-slate-100 dark:border-slate-800/60 text-slate-400 text-center font-mono font-bold bg-slate-50/50 dark:bg-slate-900/30">
-                              {rowIdx + 1}
+                              {(currentPage - 1) * pageSize + rowIdx + 1}
                             </td>
                             {getActiveTableColumns().map((colHeader, colIdx) => {
                               const cellValue = getCellValue(b, colHeader);
@@ -1200,7 +1234,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredBooks.map(b => (
+                      {paginatedBooks.map(b => (
                         <tr key={b.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                           <td className="py-3 px-3">
                             <div className="font-bold text-slate-900 dark:text-white">{b.title}</div>
@@ -1264,6 +1298,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="py-12 text-center text-xs text-slate-400 space-y-2">
                 <div>No books in {currentCollege?.name}'s catalog yet.</div>
                 <div className="text-[11px] text-slate-500">Fill the form on the left to add your first book!</div>
+              </div>
+            )}
+
+            {/* PAGINATION CONTROLS BAR */}
+            {filteredBooks.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Showing {Math.min((currentPage - 1) * pageSize + 1, filteredBooks.length)} to {Math.min(currentPage * pageSize, filteredBooks.length)} of {filteredBooks.length.toLocaleString()} books</span>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <span className="text-[11px] text-slate-400">Rows/page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 dark:text-slate-200"
+                    >
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={250}>250</option>
+                      <option value={500}>500</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <span className="px-2 font-mono font-bold text-slate-800 dark:text-slate-200">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1341,6 +1426,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onSelectTab={setActiveTab}
             onOpenQRModal={onOpenQRModal}
             onOpenBarcodeModal={onOpenBarcodeModal}
+            onOpenPublicKiosk={onOpenPublicKiosk}
+            books={books}
           />
         </motion.div>
       )}

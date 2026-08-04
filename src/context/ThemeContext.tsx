@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export type LightDarkTheme = 'light' | 'dark';
-export type ColorTheme = 'lavender' | 'peach' | 'mint' | 'cyber' | 'rose' | 'superblack' | 'glass' | 'clayglass';
+export type ColorTheme = 'lavender' | 'peach' | 'mint' | 'cyber' | 'rose' | 'superblack' | 'glass' | 'clayglass' | 'blueprint3d';
 
 export interface ThemePreset {
   id: ColorTheme;
@@ -258,6 +258,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     inputRadius: 'rounded-[24px]',
     badgeRadius: 'rounded-xl',
     cardExtraClass: 'ring-1 ring-white/40 dark:ring-white/5 shadow-2xl'
+  },
+  {
+    id: 'blueprint3d',
+    name: 'Blueprint 3D Studio',
+    emoji: '🎨',
+    tagline: 'Google Blueprint 3D claymorphism canvas with volumetric porcelain cards & tactile 3D clay buttons',
+    gradientBg: 'from-[#5865F2]/50 via-indigo-600/40 to-cyan-500/40',
+    bannerBg: 'from-[#4F46E5] via-[#5865F2] to-[#06B6D4] border-4 border-white/80 shadow-[0_20px_50px_rgba(79,70,229,0.45)]',
+    buttonBg: 'bg-gradient-to-r from-[#5865F2] via-[#6366F1] to-[#06B6D4] hover:from-[#4338CA] hover:to-[#0891B2] text-white font-black shadow-[inset_0_2px_0_rgba(255,255,255,0.5),0_10px_25px_-5px_rgba(88,101,242,0.6)] border-b-4 border-indigo-900/60 active:translate-y-0.5 active:border-b-2',
+    accentText: 'text-[#5865F2] dark:text-[#818CF8] font-black',
+    badgeBg: 'bg-[#5865F2]/15 dark:bg-[#5865F2]/25 text-[#3730A3] dark:text-[#C7D2FE] border-2 border-white/80 dark:border-[#5865F2]/40 font-black shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)]',
+    borderColor: 'border-[#5865F2]/40 dark:border-[#5865F2]/30',
+    previewColors: ['#5865f2', '#06b6d4', '#8b5cf6'],
+    pageBg: 'bg-gradient-to-br from-[#5359F6] via-[#6366F1] to-[#4F46E5] dark:from-[#0B0D2A] dark:via-[#111642] dark:to-[#1B205B]',
+    cardBg: 'bg-gradient-to-b from-[#FFFFFF] to-[#F2F5FF] dark:from-[#151A48] dark:to-[#0E1238] shadow-[inset_0_2px_4px_rgba(255,255,255,1),0_25px_60px_-15px_rgba(20,15,65,0.35)] dark:shadow-[inset_0_2px_4px_rgba(255,255,255,0.12),0_25px_60px_-15px_rgba(0,0,0,0.85)]',
+    cardBorder: 'border-4 border-white dark:border-[#384288] ring-2 ring-indigo-500/20 dark:ring-indigo-400/20 hover:border-cyan-400 dark:hover:border-cyan-400 transition-all shadow-2xl',
+    innerCardBg: 'bg-[#EAF0FF]/95 dark:bg-[#1A215C]/90 backdrop-blur-xl border-2 border-white/90 dark:border-[#333D82] shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),0_8px_20px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_2px_3px_rgba(255,255,255,0.1),0_8px_20px_rgba(0,0,0,0.4)]',
+    headerBg: 'bg-white/95 dark:bg-[#0C0F33]/95 backdrop-blur-2xl border-b-4 border-white dark:border-[#384288] shadow-lg',
+    heroCardBg: 'bg-gradient-to-b from-[#FFFFFF] via-[#F6F8FF] to-[#E9EEFF] dark:from-[#181F54] dark:via-[#131846] dark:to-[#0C1032] shadow-[inset_0_3px_6px_rgba(255,255,255,1),0_30px_70px_-15px_rgba(30,25,90,0.4)] dark:shadow-[inset_0_2px_4px_rgba(255,255,255,0.15),0_30px_70px_-15px_rgba(0,0,0,0.9)] border-4 border-white dark:border-[#3B4694]',
+    inputBg: 'bg-[#F3F6FF] dark:bg-[#0F1336] border-2 border-[#C0CCFF] dark:border-[#323C85] text-slate-900 dark:text-indigo-50 placeholder-indigo-400/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] font-bold',
+    secondaryButtonBg: 'bg-[#E2E9FF] hover:bg-[#D4E0FF] dark:bg-[#20286E] dark:hover:bg-[#2A348C] text-[#312E81] dark:text-indigo-100 border-2 border-white dark:border-[#3C48A0] font-black shadow-[inset_0_2px_0_rgba(255,255,255,0.8),0_4px_12px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.15)] border-b-3 border-indigo-300 dark:border-indigo-950',
+    modalBg: 'bg-gradient-to-b from-[#FFFFFF] to-[#F0F4FF] dark:from-[#131742] dark:to-[#0A0D2A] border-4 border-white dark:border-[#3E4AA0] shadow-[0_35px_80px_-15px_rgba(15,10,50,0.5)] dark:shadow-[0_35px_80px_-15px_rgba(0,0,0,0.95)]',
+    glowShadow: 'shadow-[0_0_60px_rgba(88,101,242,0.45)]',
+    cardRadius: 'rounded-[32px]',
+    buttonRadius: 'rounded-[22px]',
+    inputRadius: 'rounded-[22px]',
+    badgeRadius: 'rounded-2xl',
+    cardExtraClass: 'ring-4 ring-white/80 dark:ring-[#5865F2]/30 shadow-2xl'
   }
 ];
 
