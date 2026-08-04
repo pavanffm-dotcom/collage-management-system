@@ -296,7 +296,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
           {/* Circulation Desk */}
           <button
             type="button"
@@ -378,11 +378,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </button>
 
+          {/* Control Panel */}
+          <button
+            type="button"
+            onClick={() => setIsControlPanelModalOpen(true)}
+            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+          >
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <SlidersHorizontal className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">Control Panel</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Manage Columns</span>
+            </div>
+          </button>
+
           {/* Public Link (Kiosk Mode) Shortcut */}
           <button
             type="button"
             onClick={() => setIsPublicLinkModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95 col-span-2 sm:col-span-1"
+            className="p-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
           >
             <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
               <Globe className="w-5 h-5" />
@@ -393,6 +408,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </button>
         </div>
+
       </div>
 
       {/* Main Settings Options Grid */}

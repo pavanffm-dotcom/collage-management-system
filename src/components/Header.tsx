@@ -21,7 +21,9 @@ import {
   User,
   Palette,
   RefreshCw,
-  Download
+  Download,
+  SlidersHorizontal,
+  Globe
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { College } from '../types';
@@ -467,20 +469,27 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Library Directory</span>
                 </button>
 
-                {/* Settings Tab (Librarian/Admin only) */}
-                {authUser.role !== 'Staff' && (
-                  <button
-                    onClick={() => handleTabClick('admin', 'settings')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                      activeView === 'admin' && adminTab === 'settings'
-                        ? 'bg-slate-100 dark:bg-zinc-800 text-purple-600 dark:text-purple-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
-                    }`}
-                  >
-                    <Settings className="w-4 h-4 text-purple-500" />
-                    <span>Settings</span>
-                  </button>
-                )}
+                {/* Control Panel (Direct Access) */}
+                <button
+                  onClick={() => handleTabClick('admin', 'settings')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeView === 'admin' && adminTab === 'settings'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-850'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-500" />
+                  <span>Control Panel</span>
+                </button>
+
+                {/* Public Link (Direct Access) */}
+                <button
+                  onClick={() => window.open(window.location.origin, '_blank')}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200/40 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                >
+                  <Globe className="w-4 h-4 text-emerald-500" />
+                  <span>Public Link</span>
+                </button>
 
                 <button
                   onClick={onOpenQRModal}

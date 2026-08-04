@@ -133,17 +133,17 @@ function performLocalSearch(query: string, books: Book[]): AISearchResult[] {
     const keywordsStr = (book.keywords || []).join(' ').toLowerCase();
     const rawValuesStr = Object.values(book.rawCsvData || {}).map(v => String(v).toLowerCase()).join(' ');
 
-    // Exact title or substring match
+    // Exact title or full phrase match
     if (titleLower && titleLower === cleanQuery) {
       score += 1000;
       matchedConcepts.push('Exact Title Match');
     } else if (titleLower && titleLower.includes(cleanQuery)) {
-      score += 500;
-      matchedConcepts.push('Title Match');
+      score += 600;
+      matchedConcepts.push('Title Phrase Match');
     }
 
     if (authorLower && authorLower.includes(cleanQuery)) {
-      score += 300;
+      score += 400;
       matchedConcepts.push('Author Match');
     }
 
@@ -152,27 +152,27 @@ function performLocalSearch(query: string, books: Book[]): AISearchResult[] {
     for (const token of queryTokens) {
       let tokenMatched = false;
       if (titleLower.includes(token)) {
-        score += 60;
+        score += 50;
         tokenMatched = true;
         matchedConcepts.push(`Title: "${token}"`);
       }
       if (authorLower.includes(token)) {
-        score += 40;
+        score += 35;
         tokenMatched = true;
         matchedConcepts.push(`Author: "${token}"`);
       }
       if (subjectLower.includes(token)) {
-        score += 30;
+        score += 25;
         tokenMatched = true;
         matchedConcepts.push(`Subject: "${token}"`);
       }
       if (deptLower.includes(token)) {
-        score += 25;
+        score += 20;
         tokenMatched = true;
         matchedConcepts.push(`Department: "${token}"`);
       }
       if (keywordsStr.includes(token)) {
-        score += 25;
+        score += 20;
         tokenMatched = true;
         matchedConcepts.push(`Keyword: "${token}"`);
       }
@@ -189,26 +189,18 @@ function performLocalSearch(query: string, books: Book[]): AISearchResult[] {
       if (tokenMatched) matchingTokensCount++;
     }
 
+    // Multi-token query bonus if all tokens match
     if (matchingTokensCount === queryTokens.length && queryTokens.length > 0) {
-      score += 200;
+      score += 250;
     }
 
-    // Special concept mappings for common student query examples
-    if (cleanQuery.includes('fish') || cleanQuery.includes('curry') || cleanQuery.includes('goa') || cleanQuery.includes('recipe')) {
-      if (keywordsStr.includes('fish') || keywordsStr.includes('curry') || keywordsStr.includes('goa') || rawValuesStr.includes('fish') || rawValuesStr.includes('curry')) {
-        score += 40;
-        matchedConcepts.push('Seafood & Goan Cuisine Topic');
-      }
-    }
-    if (cleanQuery.includes('machine learning') || cleanQuery.includes('ml') || cleanQuery.includes('python')) {
-      if (keywordsStr.includes('machine learning') || keywordsStr.includes('python') || rawValuesStr.includes('python')) {
-        score += 40;
-        matchedConcepts.push('AI & Python Topic');
-      }
+    // Penalize multi-token queries where only 1 token matched when query has 2+ tokens
+    if (queryTokens.length >= 2 && matchingTokensCount < 2 && !titleLower.includes(cleanQuery)) {
+      score = Math.floor(score * 0.4);
     }
 
-    if (score >= 30) {
-      const confidence = Math.min(99, Math.max(50, Math.round(score > 100 ? 95 : score)));
+    if (score >= 40) {
+      const confidence = Math.min(99, Math.max(50, Math.round(score > 300 ? 98 : (score > 150 ? 88 : score))));
       const uniqueConcepts = Array.from(new Set(matchedConcepts));
       scoredResults.push({
         book,
@@ -225,13 +217,16 @@ function performLocalSearch(query: string, books: Book[]): AISearchResult[] {
 
   // Filter out low-confidence noise when strong matches are present
   const highQualityResults = scoredResults.filter(item => {
-    if (topScore >= 85) {
-      return item.score >= Math.max(65, topScore * 0.6);
+    if (topScore >= 90) {
+      return item.score >= Math.max(78, topScore * 0.82);
     }
-    return item.score >= 50;
+    if (topScore >= 75) {
+      return item.score >= Math.max(68, topScore * 0.75);
+    }
+    return item.score >= 60;
   });
 
-  return highQualityResults.slice(0, 50).map((item, index) => ({
+  return highQualityResults.map((item, index) => ({
     book: item.book,
     confidenceScore: item.score,
     matchReason: item.reason,
@@ -811,13 +806,16 @@ app.post('/api/search/exact', (req, res) => {
 
     const topScore = scored.length > 0 ? scored[0].score : 0;
     const filteredScored = scored.filter(s => {
-      if (topScore >= 300) {
-        return s.score >= Math.max(150, topScore * 0.4);
+      if (topScore >= 500) {
+        return s.score >= Math.max(300, topScore * 0.65);
+      }
+      if (topScore >= 200) {
+        return s.score >= Math.max(150, topScore * 0.6);
       }
       if (queryTokens.length >= 2) {
-        return s.score >= 100;
+        return s.score >= 120;
       }
-      return s.score >= 40;
+      return s.score >= 50;
     });
 
     results = filteredScored.map(s => s.book);
@@ -925,7 +923,7 @@ Analyze the student query:
 1. Extract the core intent, topic keywords, and semantic concepts (e.g., if asking for "Fish Curry book", concepts are ['Fish', 'Cooking', 'Recipe', 'Goa', 'Seafood', 'Traditional Food']).
 2. Search through the library database provided below ONLY. Do NOT invent or hallucinate any books outside this catalog.
 3. For matching books, calculate a confidence score (0 to 100), explain why it matches, and list matched concepts.
-4. CRITICAL: ONLY return books in matchedBookIds if they are ACTUALLY RELEVANT to the query (confidence score >= 55). If only 1 book matches, return ONLY that 1 book. Do NOT include unrelated books.
+4. CRITICAL RELEVANCE RULE: ONLY return books in matchedBookIds if they are TRULY RELEVANT to the query (confidence score >= 75). If only 1 or 2 books in the catalog match (e.g., "Understanding Lost Kingdom"), return ONLY those 1 or 2 books. DO NOT return dozens of unrelated books that happen to share a single word like "Understanding" or "Lost".
 
 Library Catalog:
 ${JSON.stringify(catalogSummary, null, 2)}
@@ -979,7 +977,7 @@ Return strictly JSON matching this structure.`;
       const matchedIdsSet = new Set<string>();
 
       matchedList.forEach((item, index) => {
-        if (item.confidenceScore && item.confidenceScore < 55) return;
+        if (item.confidenceScore && item.confidenceScore < 70) return;
         const book = collegeBooksCatalog.find(b => b.id === item.id);
         if (book) {
           matchedIdsSet.add(book.id);

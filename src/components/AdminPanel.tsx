@@ -59,7 +59,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const setActiveTab = propSetActiveTab || setLocalActiveTab;
   const [searchFilter, setSearchFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -278,7 +278,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const getActiveTableColumns = (): string[] => {
+  const activeTableColumns = useMemo(() => {
     if (detectedCustomSchema && detectedCustomSchema.length > 0) {
       return detectedCustomSchema;
     }
@@ -313,7 +313,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       'ISBN / Barcode',
       'Description / Notes'
     ];
-  };
+  }, [detectedCustomSchema, books]);
 
   const getCellValue = (book: Book, colHeader: string): string => {
     if (!book) return '-';
@@ -544,6 +544,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
+    const updatedRawCsvData: Record<string, string> = {
+      ...(editingBook?.rawCsvData || {}),
+      ...dynamicFormValues
+    };
+    const updatedCustomAttrs: Record<string, string> = {
+      ...(editingBook?.customAttributes || {}),
+      ...customAttrs,
+      ...dynamicFormValues
+    };
+
     const bookPayload = {
       title,
       subtitle: formSubtitle,
@@ -556,6 +566,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       keywords: formKeywords ? formKeywords.split(',').map(k => k.trim()) : [dept, author],
       isbn: isbn || `978-81-${Math.floor(100000 + Math.random() * 900000)}`,
       callNumber: callNum || `${dept.substring(0, 3).toUpperCase()} ${Math.floor(100 + Math.random() * 900)}`,
+      accessionNumber: dynamicFormValues['Book_ID'] || dynamicFormValues['BOOK_ID'] || dynamicFormValues['book_id'] || editingBook?.accessionNumber || formIsbn,
       location: {
         almariNumber: almari.startsWith('Almari') ? almari : `Almari ${almari}`,
         rowNumber: row.startsWith('Row') ? row : `Row ${row}`,
@@ -565,7 +576,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       },
       totalCopies: Number(copies) || 5,
       availableCopies: Number(copies) || 5,
-      customAttributes: Object.keys(customAttrs).length > 0 ? customAttrs : (editingBook?.customAttributes || undefined),
+      rawCsvData: updatedRawCsvData,
+      customAttributes: Object.keys(updatedCustomAttrs).length > 0 ? updatedCustomAttrs : undefined,
       collegeId: currentCollege?.id || 'col-gec-goa'
     };
 
@@ -612,20 +624,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (detectedCustomSchema && detectedCustomSchema.length > 0) {
       const initialDynamic: Record<string, string> = {};
       detectedCustomSchema.forEach(col => {
+        // 1. Direct exact key check in rawCsvData or customAttributes
+        const directVal = b.rawCsvData?.[col] ?? b.customAttributes?.[col];
+        if (directVal !== undefined && directVal !== null && directVal !== '') {
+          initialDynamic[col] = String(directVal);
+          return;
+        }
+
+        // 2. Case-insensitive key check in rawCsvData
         const norm = col.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (norm.includes('title') || norm.includes('book') || norm.includes('name')) initialDynamic[col] = b.title;
-        else if (norm.includes('author') || norm.includes('writer')) initialDynamic[col] = b.author;
-        else if (norm.includes('dept') || norm.includes('department')) initialDynamic[col] = b.department;
-        else if (norm.includes('subject')) initialDynamic[col] = b.subject;
-        else if (norm.includes('almari') || norm.includes('rack')) initialDynamic[col] = b.location.almariNumber;
-        else if (norm.includes('row')) initialDynamic[col] = b.location.rowNumber;
-        else if (norm.includes('pos')) initialDynamic[col] = b.location.shelfPosition;
-        else if (norm.includes('publisher')) initialDynamic[col] = b.publisher;
-        else if (norm.includes('isbn')) initialDynamic[col] = b.isbn;
-        else if (norm.includes('call')) initialDynamic[col] = b.callNumber;
-        else if (norm.includes('copies')) initialDynamic[col] = String(b.totalCopies);
-        else if (b.customAttributes && b.customAttributes[col]) initialDynamic[col] = b.customAttributes[col];
-        else initialDynamic[col] = '';
+        if (b.rawCsvData) {
+          const matchKey = Object.keys(b.rawCsvData).find(
+            k => k.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === norm
+          );
+          if (matchKey && b.rawCsvData[matchKey] !== undefined) {
+            initialDynamic[col] = String(b.rawCsvData[matchKey]);
+            return;
+          }
+        }
+
+        // 3. Case-insensitive key check in customAttributes
+        if (b.customAttributes) {
+          const matchKey = Object.keys(b.customAttributes).find(
+            k => k.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === norm
+          );
+          if (matchKey && b.customAttributes[matchKey] !== undefined) {
+            initialDynamic[col] = String(b.customAttributes[matchKey]);
+            return;
+          }
+        }
+
+        // 4. Exact field fallbacks
+        if (norm === 'bookid' || norm === 'id' || norm === 'accession' || norm === 'accno' || norm === 'register' || norm === 'asset' || norm === 'acc') {
+          initialDynamic[col] = b.accessionNumber || b.isbn || b.id;
+        } else if (norm === 'title' || norm === 'booktitle' || norm === 'bookname' || norm === 'name') {
+          initialDynamic[col] = b.title;
+        } else if (norm.includes('author') || norm.includes('writer')) {
+          initialDynamic[col] = b.author;
+        } else if (norm.includes('dept') || norm.includes('department')) {
+          initialDynamic[col] = b.department;
+        } else if (norm.includes('subject')) {
+          initialDynamic[col] = b.subject;
+        } else if (norm.includes('almari') || norm.includes('rack')) {
+          initialDynamic[col] = b.location.almariNumber;
+        } else if (norm.includes('row')) {
+          initialDynamic[col] = b.location.rowNumber;
+        } else if (norm.includes('pos')) {
+          initialDynamic[col] = b.location.shelfPosition;
+        } else if (norm.includes('publisher')) {
+          initialDynamic[col] = b.publisher;
+        } else if (norm.includes('isbn') || norm.includes('barcode')) {
+          initialDynamic[col] = b.isbn;
+        } else if (norm.includes('call')) {
+          initialDynamic[col] = b.callNumber;
+        } else if (norm.includes('copies') || norm.includes('qty')) {
+          initialDynamic[col] = String(b.totalCopies);
+        } else {
+          initialDynamic[col] = '';
+        }
       });
       setDynamicFormValues(initialDynamic);
     }
@@ -1057,7 +1113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     title="Display exact rows and columns from Excel/CSV file"
                   >
                     <Table className="w-3.5 h-3.5 shrink-0" />
-                    <span>Exact Sheet ({getActiveTableColumns().length} Cols)</span>
+                    <span>Exact Sheet ({activeTableColumns.length} Cols)</span>
                   </button>
                   <button
                     type="button"
@@ -1118,7 +1174,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold">
                         <FileSpreadsheet className="w-4 h-4 shrink-0 text-indigo-500" />
-                        <span>Showing all {getActiveTableColumns().length} columns</span>
+                        <span>Showing all {activeTableColumns.length} columns</span>
                       </span>
                       <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono px-2.5 py-0.5 rounded-full font-bold">
                         Swipe or ◄ ► arrow keys to scroll
@@ -1142,7 +1198,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <th className="py-2.5 px-3 border-b border-r border-slate-200 dark:border-slate-800 bg-slate-200/70 dark:bg-slate-800/80 text-center w-10">
                             #
                           </th>
-                          {getActiveTableColumns().map((colHeader, idx) => (
+                          {activeTableColumns.map((colHeader, idx) => (
                             <th
                               key={idx}
                               className="py-2.5 px-3 border-b border-r border-slate-200 dark:border-slate-800 min-w-[140px] max-w-[300px]"
@@ -1167,7 +1223,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <td className="py-2.5 px-2.5 border-r border-slate-100 dark:border-slate-800/60 text-slate-400 text-center font-mono font-bold bg-slate-50/50 dark:bg-slate-900/30">
                               {(currentPage - 1) * pageSize + rowIdx + 1}
                             </td>
-                            {getActiveTableColumns().map((colHeader, colIdx) => {
+                            {activeTableColumns.map((colHeader, colIdx) => {
                               const cellValue = getCellValue(b, colHeader);
                               const isLink = cellValue.startsWith('http://') || cellValue.startsWith('https://');
 
@@ -1316,6 +1372,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       }}
                       className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 dark:text-slate-200"
                     >
+                      <option value={25}>25</option>
                       <option value={50}>50</option>
                       <option value={100}>100</option>
                       <option value={250}>250</option>
