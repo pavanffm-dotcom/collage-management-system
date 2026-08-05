@@ -199,7 +199,7 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 pb-28 transition-colors duration-500`}>
       
       {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-2 sm:px-6 pt-1 sm:pt-3 space-y-4">
+      <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 pt-1 sm:pt-3 space-y-4">
         
         {/* Search Header Box */}
         <motion.div 
