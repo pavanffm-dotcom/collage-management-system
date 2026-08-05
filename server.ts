@@ -189,11 +189,13 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
   if (!query || !query.trim() || !books || books.length === 0) return [];
 
   const rawQuery = query.trim().toLowerCase();
+  const normalizedQuery = rawQuery.replace(/\s+/g, ' ');
+
   const stopWords = new Set(['book', 'books', 'the', 'and', 'for', 'with', 'show', 'me', 'get', 'find', 'search', 'shelf', 'shelves', 'which', 'where', 'that', 'from', 'have', 'need', 'about', 'want', 'list', 'all', 'any', 'a', 'an', 'in', 'on', 'at', 'to', 'of', 'is', 'it', 'please', 'can', 'you', 'give']);
   
-  let queryTokens = tokenizeText(rawQuery).filter(t => !stopWords.has(t));
+  let queryTokens = tokenizeText(normalizedQuery).filter(t => !stopWords.has(t));
   if (queryTokens.length === 0) {
-    queryTokens = tokenizeText(rawQuery);
+    queryTokens = tokenizeText(normalizedQuery);
   }
 
   // Connect to exact Control Panel fields based on search mode
@@ -203,7 +205,7 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
   
   const scoredItems: {
     book: Book;
-    score: number;
+    rawScore: number;
     matchReason: string;
     matchedConcepts: string[];
   }[] = [];
@@ -213,168 +215,206 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
     const matchReasons: string[] = [];
     const matchedConcepts: string[] = [];
 
-    const titleLower = (book.title || '').toLowerCase();
-    const authorLower = (book.author || '').toLowerCase();
-    const accessionLower = (book.accessionNumber || '').toLowerCase();
-    const isbnLower = (book.isbn || '').toLowerCase();
-    const subjectLower = (book.subject || '').toLowerCase();
-    const deptLower = (book.department || '').toLowerCase();
-    const descLower = ((book.description || '') + ' ' + (book.summary || '')).toLowerCase();
-    const keywordsLower = (book.keywords || []).map(k => k.toLowerCase()).join(' ');
-    const rawDataLower = Object.values(book.rawCsvData || {}).map(v => String(v).toLowerCase()).join(' ');
-    const customAttrsLower = Object.values(book.customAttributes || {}).map(v => String(v).toLowerCase()).join(' ');
+    const titleLower = (book.title || '').trim().toLowerCase();
+    const authorLower = (book.author || '').trim().toLowerCase();
+    const accessionLower = (book.accessionNumber || '').trim().toLowerCase();
+    const isbnLower = (book.isbn || '').trim().toLowerCase();
+    const callNumberLower = (book.callNumber || '').trim().toLowerCase();
+    const subjectLower = (book.subject || '').trim().toLowerCase();
+    const deptLower = (book.department || '').trim().toLowerCase();
+    const descLower = ((book.description || '') + ' ' + (book.summary || '')).trim().toLowerCase();
+    const keywordsLower = (book.keywords || []).map(k => k.trim().toLowerCase()).join(' ');
 
-    const mappedText = extractMappedColumnValues(book, mappedCols);
+    const rawCsvTitle = book.rawCsvData ? String(book.rawCsvData.title || book.rawCsvData.Title || book.rawCsvData.BookTitle || book.rawCsvData['Book Name'] || '').trim().toLowerCase() : '';
+    const rawDataLower = Object.values(book.rawCsvData || {}).map(v => String(v).trim().toLowerCase()).join(' ');
+    const customAttrsLower = Object.values(book.customAttributes || {}).map(v => String(v).trim().toLowerCase()).join(' ');
 
-    // 1. Control Panel Mapped Field Match (Highest Priority)
-    if (mappedText) {
-      if (mappedText === rawQuery) {
-        score += 3000;
-        matchReasons.push('Exact match on Control Panel connected column');
-      } else if (mappedText.includes(rawQuery)) {
-        score += 1800;
-        matchReasons.push('Connected column phrase match');
-      } else {
-        // Check token coverage in mappedText (handles reversed words and typos)
-        let mappedTokensFound = 0;
-        for (const qToken of queryTokens) {
-          if (mappedText.includes(qToken)) {
-            mappedTokensFound++;
-            score += 250;
-          } else {
-            // Check fuzzy match on mapped text words
-            for (const word of tokenizeText(mappedText)) {
-              if (fuzzyRatio(qToken, word) >= 0.72) {
-                mappedTokensFound++;
-                score += 180;
-                matchReasons.push(`Fuzzy match on connected column ('${qToken}' ≈ '${word}')`);
-                break;
-              }
-            }
-          }
-        }
-        if (queryTokens.length > 0 && mappedTokensFound === queryTokens.length) {
-          score += 1200;
-          matchReasons.push('All words matched in Control Panel connected column');
-        }
-      }
-    }
+    const mappedText = extractMappedColumnValues(book, mappedCols).trim().toLowerCase();
 
-    // 2. Exact Title / Phrase & Permutation Match
-    if (titleLower === rawQuery) {
-      score += 2500;
+    // 1. EXACT & HIGH PRIORITY MATCHES (Tier 1: 30,000 - 100,000 points)
+    
+    // 1a. Exact Title Match
+    if (titleLower === normalizedQuery || (rawCsvTitle && rawCsvTitle === normalizedQuery)) {
+      score += 100000;
       matchReasons.push('Exact Title Match');
       matchedConcepts.push('Exact Title');
-    } else if (titleLower.includes(rawQuery)) {
-      score += 1500;
+    } 
+    // 1b. Title Starts With Query
+    else if (titleLower.startsWith(normalizedQuery) || (rawCsvTitle && rawCsvTitle.startsWith(normalizedQuery))) {
+      score += 60000;
+      matchReasons.push('Title Prefix Match');
+      matchedConcepts.push('Title Prefix');
+    }
+    // 1c. Title Contains Full Query Phrase
+    else if (titleLower.includes(normalizedQuery) || (rawCsvTitle && rawCsvTitle.includes(normalizedQuery))) {
+      score += 40000;
       matchReasons.push('Title Phrase Match');
       matchedConcepts.push('Title Substring');
-    } else {
-      // Check word permutation in Title (e.g. "Structures Data" vs "Data Structures")
-      const titleTokens = tokenizeText(titleLower);
-      let titleTokensMatched = 0;
-      for (const qToken of queryTokens) {
-        if (titleLower.includes(qToken)) {
-          titleTokensMatched++;
-        } else {
-          for (const tToken of titleTokens) {
-            if (fuzzyRatio(qToken, tToken) >= 0.72) {
-              titleTokensMatched++;
-              break;
-            }
-          }
-        }
-      }
-      if (queryTokens.length > 0 && titleTokensMatched === queryTokens.length) {
-        score += 1200;
-        matchReasons.push('All title words matched (reversed/permutation)');
-        matchedConcepts.push('Reversed Title Words');
-      } else if (titleTokensMatched > 0) {
-        score += titleTokensMatched * 200;
-      }
-
-      // Fuzzy ratio whole title vs query
-      const titleFuzzy = fuzzyRatio(rawQuery, titleLower);
-      if (titleFuzzy >= 0.70) {
-        score += Math.floor(titleFuzzy * 1000);
-        matchReasons.push(`Title spelling correction match (${Math.round(titleFuzzy * 100)}% similarity)`);
-      }
     }
 
-    // 3. Author Match (exact, permutation, fuzzy)
-    if (authorLower) {
-      if (authorLower === rawQuery) {
-        score += 1200;
-        matchReasons.push('Exact Author Match');
-      } else if (authorLower.includes(rawQuery)) {
-        score += 800;
-        matchReasons.push('Author Match');
-      } else {
-        const authorFuzzy = fuzzyRatio(rawQuery, authorLower);
-        if (authorFuzzy >= 0.70) {
-          score += Math.floor(authorFuzzy * 700);
-          matchReasons.push(`Author typo match ('${rawQuery}' ≈ '${authorLower}')`);
-        }
-      }
-    }
-
-    // 4. Accession Number / ISBN / Barcode / Call Number Match
-    if (accessionLower.includes(rawQuery) || (rawQuery.length >= 3 && accessionLower.replace(/[^a-z0-9]/g, '').includes(rawQuery.replace(/[^a-z0-9]/g, '')))) {
-      score += 2200;
+    // 1d. Exact Accession / ISBN / Call Number Match
+    if (accessionLower && (accessionLower === normalizedQuery || accessionLower.replace(/[^a-z0-9]/g, '') === normalizedQuery.replace(/[^a-z0-9]/g, ''))) {
+      score += 90000;
       matchReasons.push(`Accession Number ${book.accessionNumber} Match`);
+    } else if (accessionLower && accessionLower.includes(normalizedQuery)) {
+      score += 35000;
+      matchReasons.push('Accession Substring Match');
     }
-    if (isbnLower && (isbnLower === rawQuery || isbnLower.replace(/[^0-9]/g, '').includes(rawQuery.replace(/[^0-9]/g, '')))) {
-      score += 2000;
+
+    if (isbnLower && (isbnLower === normalizedQuery || isbnLower.replace(/[^0-9]/g, '') === normalizedQuery.replace(/[^0-9]/g, ''))) {
+      score += 90000;
       matchReasons.push(`ISBN ${book.isbn} Match`);
     }
 
-    // 5. Subject, Department, Keywords, Description & Raw CSV
+    if (callNumberLower && callNumberLower === normalizedQuery) {
+      score += 85000;
+      matchReasons.push('Call Number Match');
+    }
+
+    // 1e. Control Panel Mapped Field Match
+    if (mappedText) {
+      if (mappedText === normalizedQuery) {
+        score += 80000;
+        matchReasons.push('Exact match on connected column');
+      } else if (mappedText.includes(normalizedQuery)) {
+        score += 30000;
+        matchReasons.push('Connected column phrase match');
+      }
+    }
+
+    // 1f. Exact Author Match
+    if (authorLower === normalizedQuery) {
+      score += 50000;
+      matchReasons.push('Exact Author Match');
+    } else if (authorLower.includes(normalizedQuery)) {
+      score += 20000;
+      matchReasons.push('Author Phrase Match');
+    }
+
+    // 2. TOKEN & WORD PERMUTATION MATCHING (Tier 2: 1,000 - 25,000 points)
+    const titleTokens = tokenizeText(titleLower);
+    let titleTokensMatched = 0;
+
     for (const qToken of queryTokens) {
+      if (titleLower.includes(qToken)) {
+        titleTokensMatched++;
+      } else {
+        for (const tToken of titleTokens) {
+          if (fuzzyRatio(qToken, tToken) >= 0.80) {
+            titleTokensMatched++;
+            break;
+          }
+        }
+      }
+    }
+
+    if (queryTokens.length > 0 && titleTokensMatched === queryTokens.length) {
+      score += 25000;
+      matchReasons.push('All query words matched in Title');
+      matchedConcepts.push('All Words Title Match');
+    } else if (titleTokensMatched > 0) {
+      score += titleTokensMatched * 2000;
+    }
+
+    // Title Fuzzy Ratio (for spelling mistakes)
+    if (titleLower && normalizedQuery.length >= 4) {
+      const titleFuzzy = fuzzyRatio(normalizedQuery, titleLower);
+      if (titleFuzzy >= 0.75) {
+        score += Math.floor(titleFuzzy * 15000);
+        matchReasons.push(`Spelling similarity (${Math.round(titleFuzzy * 100)}%)`);
+      }
+    }
+
+    // Author, Subject, Department token matches
+    for (const qToken of queryTokens) {
+      if (qToken.length < 2) continue; // Ignore single letter noise for generic fields
+      
+      if (authorLower.includes(qToken)) {
+        score += 1500;
+      }
       if (subjectLower.includes(qToken)) {
-        score += 120;
+        score += 1000;
         matchedConcepts.push(`Subject: ${book.subject}`);
       }
       if (deptLower.includes(qToken)) {
-        score += 100;
+        score += 800;
         matchedConcepts.push(`Dept: ${book.department}`);
       }
       if (keywordsLower.includes(qToken)) {
-        score += 80;
-        matchedConcepts.push(`Keyword match`);
+        score += 600;
+        matchedConcepts.push(`Keyword: ${qToken}`);
       }
       if (descLower.includes(qToken)) {
-        score += 60;
+        score += 300;
       }
-      if (rawDataLower.includes(qToken) || customAttrsLower.includes(qToken)) {
-        score += 80;
-        matchReasons.push('Spreadsheet Data match');
+
+      // Raw CSV & custom attributes match - ONLY for meaningful tokens (length >= 3)
+      if (qToken.length >= 3) {
+        if (rawDataLower.includes(qToken) || customAttrsLower.includes(qToken)) {
+          score += 150;
+        }
       }
     }
 
     if (score > 0) {
-      const confidenceScore = Math.min(99, Math.max(50, Math.round(score > 1000 ? 98 : (score > 500 ? 92 : (score > 200 ? 82 : (score > 100 ? 72 : 60))))));
       const primaryReason = matchReasons.length > 0 ? matchReasons[0] : 'Matches query topic and keywords';
       const uniqueConcepts = Array.from(new Set(matchedConcepts));
 
       scoredItems.push({
         book,
-        score: confidenceScore,
+        rawScore: score,
         matchReason: primaryReason,
-        matchedConcepts: uniqueConcepts.length > 0 ? uniqueConcepts : tokenizeText(rawQuery)
+        matchedConcepts: uniqueConcepts.length > 0 ? uniqueConcepts : queryTokens
       });
     }
   }
 
-  // Sort by confidence score descending
-  scoredItems.sort((a, b) => b.score - a.score);
+  // CRITICAL FIX: Sort by rawScore DESCENDING!
+  scoredItems.sort((a, b) => b.rawScore - a.rawScore);
 
-  return scoredItems.map((item, index) => ({
-    book: item.book,
-    confidenceScore: item.score,
-    matchReason: item.matchReason,
-    matchedConcepts: item.matchedConcepts,
-    relevanceRank: index + 1
-  }));
+  // NOISE FILTERING: If we have strong matches (score >= 5000), filter out weak random matches below threshold
+  if (scoredItems.length > 0) {
+    const topScore = scoredItems[0].rawScore;
+    if (topScore >= 5000) {
+      const cutoffThreshold = Math.max(1000, topScore * 0.15);
+      const filteredItems = scoredItems.filter(item => item.rawScore >= cutoffThreshold);
+      if (filteredItems.length > 0) {
+        return filteredItems.map((item, index) => {
+          let confidenceScore = 98;
+          if (item.rawScore >= 80000) confidenceScore = 99;
+          else if (item.rawScore >= 30000) confidenceScore = 95;
+          else if (item.rawScore >= 10000) confidenceScore = 90;
+          else if (item.rawScore >= 5000) confidenceScore = 84;
+          else confidenceScore = Math.min(80, Math.max(50, Math.round(item.rawScore / 50)));
+
+          return {
+            book: item.book,
+            confidenceScore,
+            matchReason: item.matchReason,
+            matchedConcepts: item.matchedConcepts,
+            relevanceRank: index + 1
+          };
+        });
+      }
+    }
+  }
+
+  return scoredItems.map((item, index) => {
+    let confidenceScore = 90;
+    if (item.rawScore >= 80000) confidenceScore = 99;
+    else if (item.rawScore >= 30000) confidenceScore = 95;
+    else if (item.rawScore >= 10000) confidenceScore = 90;
+    else if (item.rawScore >= 5000) confidenceScore = 84;
+    else confidenceScore = Math.min(80, Math.max(50, Math.round(item.rawScore / 50)));
+
+    return {
+      book: item.book,
+      confidenceScore,
+      matchReason: item.matchReason,
+      matchedConcepts: item.matchedConcepts,
+      relevanceRank: index + 1
+    };
+  });
 }
 
 // REST API Endpoints
@@ -754,8 +794,8 @@ app.post('/api/books/bulk', (req, res) => {
         lastUpdated: dateStr
       };
 
-      booksCatalog.unshift(newBook);
-      const newIdx = 0; // Because unshifted to front
+      const newIdx = booksCatalog.length;
+      booksCatalog.push(newBook);
       if (newBook.accessionNumber) accessionMap.set(newBook.accessionNumber.toLowerCase(), newIdx);
       if (newBook.isbn && !newBook.isbn.startsWith('978-0-0000')) isbnMap.set(newBook.isbn.toLowerCase(), newIdx);
       titleAuthorMap.set(titleAuthorKey, newIdx);
