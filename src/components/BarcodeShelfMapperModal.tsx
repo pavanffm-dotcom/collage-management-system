@@ -297,7 +297,7 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
   if (!isOpen) return null;
 
   const collegeName = currentCollege?.name || 'Goa Engineering College';
-  const publicPageUrl = `${window.location.origin}?collegeId=${currentCollege?.id || 'col-gec-goa'}`;
+  const publicPageUrl = `${window.location.origin}${window.location.pathname}?collegeId=${currentCollege?.id || 'col-gec-goa'}&public=true`;
 
   return (
     <motion.div

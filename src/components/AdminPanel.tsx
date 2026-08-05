@@ -30,6 +30,7 @@ interface AdminPanelProps {
   onOpenBarcodeModal?: () => void;
   onClearCatalog?: () => Promise<void>;
   onOpenPublicKiosk?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -51,7 +52,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenQRModal,
   onOpenBarcodeModal,
   onClearCatalog,
-  onOpenPublicKiosk
+  onOpenPublicKiosk,
+  onOpenInstallModal
 }) => {
   const { currentPreset } = useTheme();
   const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
@@ -687,7 +689,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const publicPageUrl = `${window.location.origin}?collegeId=${currentCollege?.id || 'col-gec-goa'}`;
+  const publicPageUrl = `${window.location.origin}${window.location.pathname}?collegeId=${currentCollege?.id || 'col-gec-goa'}&public=true`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(publicPageUrl)}`;
 
   const handleCopyLink = () => {
@@ -1377,6 +1379,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <option value={100}>100</option>
                       <option value={250}>250</option>
                       <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                      <option value={2500}>2500</option>
+                      <option value={5000}>5000</option>
+                      <option value={10000}>10000</option>
                     </select>
                   </div>
                 </div>
@@ -1484,6 +1490,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onOpenQRModal={onOpenQRModal}
             onOpenBarcodeModal={onOpenBarcodeModal}
             onOpenPublicKiosk={onOpenPublicKiosk}
+            onOpenInstallModal={onOpenInstallModal}
             books={books}
           />
         </motion.div>

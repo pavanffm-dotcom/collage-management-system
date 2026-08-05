@@ -353,6 +353,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newClasses = preset.pageBg.split(' ').filter(Boolean);
     document.body.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-fixed', 'bg-no-repeat');
     document.documentElement.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-fixed', 'bg-no-repeat');
+
+    // Dynamically update mobile browser/PWA status bar theme-color
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.setAttribute('name', 'theme-color');
+      document.head.appendChild(themeMeta);
+    }
+    const hexBg = colorTheme === 'superblack' ? '#000000' : (theme === 'dark' ? '#090d16' : '#f8fafc');
+    themeMeta.setAttribute('content', hexBg);
   }, [colorTheme, theme]);
 
   const toggleTheme = () => {

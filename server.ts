@@ -109,128 +109,266 @@ function saveData() {
 // Analytics & Search Logs (Scoped by college)
 const searchLogs: { query: string; type: 'ai' | 'exact'; timestamp: string; resultsCount: number; collegeId: string }[] = [];
 
-// Helper: Local fallback fuzzy semantic search if AI key is missing or offline
-function performLocalSearch(query: string, books: Book[]): AISearchResult[] {
-  const cleanQuery = query.toLowerCase().trim();
-  const stopWords = new Set(['book', 'books', 'the', 'and', 'for', 'with', 'show', 'me', 'get', 'find', 'search', 'shelf', 'shelves', 'which', 'where', 'that', 'from', 'have', 'need', 'about', 'want', 'list', 'all', 'any', 'a', 'an', 'in', 'on', 'at', 'to', 'of', 'is', 'it']);
-  let queryTokens = cleanQuery.split(/\s+/).filter(t => t.length > 1 && !stopWords.has(t));
+// 🔍 Advanced Local Search Engine with Fuzzy Matching, Word-Permutation & Control Panel Linker Support
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
 
-  if (queryTokens.length === 0 && cleanQuery.length > 0) {
-    queryTokens = [cleanQuery];
+function fuzzyRatio(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const dist = levenshteinDistance(a.toLowerCase(), b.toLowerCase());
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  return 1 - dist / maxLen;
+}
+
+function tokenizeText(text: string): string[] {
+  if (!text) return [];
+  const cleaned = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+  return cleaned.split(/\s+/).filter(t => t.length > 0);
+}
+
+// Extracts values from a book specifically corresponding to Control Panel mapped columns
+function extractMappedColumnValues(book: Book, mappedCols: string[]): string {
+  if (!mappedCols || mappedCols.length === 0) return '';
+  let text = '';
+  const colsLower = mappedCols.map(c => c.toLowerCase().trim()).filter(Boolean);
+
+  for (const col of colsLower) {
+    if (col === 'title' && book.title) text += ' ' + book.title;
+    if (col === 'author' && book.author) text += ' ' + book.author;
+    if (col === 'subject' && book.subject) text += ' ' + book.subject;
+    if (col === 'department' && book.department) text += ' ' + book.department;
+    if (col === 'description' && book.description) text += ' ' + book.description;
+    if (col === 'summary' && book.summary) text += ' ' + book.summary;
+    if (col === 'keywords' && book.keywords) text += ' ' + book.keywords.join(' ');
+    if (col === 'isbn' && book.isbn) text += ' ' + book.isbn;
+    if (col === 'accessionnumber' && book.accessionNumber) text += ' ' + book.accessionNumber;
+    if (col === 'publisher' && book.publisher) text += ' ' + book.publisher;
+
+    if (book.rawCsvData) {
+      Object.entries(book.rawCsvData).forEach(([k, v]) => {
+        if (k.toLowerCase() === col || k.toLowerCase().includes(col) || col.includes(k.toLowerCase())) {
+          text += ' ' + String(v);
+        }
+      });
+    }
+    if (book.customAttributes) {
+      Object.entries(book.customAttributes).forEach(([k, v]) => {
+        if (k.toLowerCase() === col || k.toLowerCase().includes(col) || col.includes(k.toLowerCase())) {
+          text += ' ' + String(v);
+        }
+      });
+    }
+  }
+  return text.trim().toLowerCase();
+}
+
+// Core Local Intelligent Search Engine
+function performLocalSearch(query: string, books: Book[], searchMappings?: any): AISearchResult[] {
+  if (!query || !query.trim() || !books || books.length === 0) return [];
+
+  const rawQuery = query.trim().toLowerCase();
+  const stopWords = new Set(['book', 'books', 'the', 'and', 'for', 'with', 'show', 'me', 'get', 'find', 'search', 'shelf', 'shelves', 'which', 'where', 'that', 'from', 'have', 'need', 'about', 'want', 'list', 'all', 'any', 'a', 'an', 'in', 'on', 'at', 'to', 'of', 'is', 'it', 'please', 'can', 'you', 'give']);
+  
+  let queryTokens = tokenizeText(rawQuery).filter(t => !stopWords.has(t));
+  if (queryTokens.length === 0) {
+    queryTokens = tokenizeText(rawQuery);
   }
 
-  const scoredResults: { book: Book; score: number; concepts: string[]; reason: string }[] = [];
+  const mappedCols = searchMappings?.aiColumns || searchMappings?.nameColumns || [];
+  
+  const scoredItems: {
+    book: Book;
+    score: number;
+    matchReason: string;
+    matchedConcepts: string[];
+  }[] = [];
 
   for (const book of books) {
     let score = 0;
+    const matchReasons: string[] = [];
     const matchedConcepts: string[] = [];
 
     const titleLower = (book.title || '').toLowerCase();
     const authorLower = (book.author || '').toLowerCase();
+    const accessionLower = (book.accessionNumber || '').toLowerCase();
+    const isbnLower = (book.isbn || '').toLowerCase();
     const subjectLower = (book.subject || '').toLowerCase();
     const deptLower = (book.department || '').toLowerCase();
     const descLower = ((book.description || '') + ' ' + (book.summary || '')).toLowerCase();
-    const keywordsStr = (book.keywords || []).join(' ').toLowerCase();
-    const rawValuesStr = Object.values(book.rawCsvData || {}).map(v => String(v).toLowerCase()).join(' ');
+    const keywordsLower = (book.keywords || []).map(k => k.toLowerCase()).join(' ');
+    const rawDataLower = Object.values(book.rawCsvData || {}).map(v => String(v).toLowerCase()).join(' ');
+    const customAttrsLower = Object.values(book.customAttributes || {}).map(v => String(v).toLowerCase()).join(' ');
 
-    // Exact title or full phrase match
-    if (titleLower && titleLower === cleanQuery) {
-      score += 1000;
-      matchedConcepts.push('Exact Title Match');
-    } else if (titleLower && titleLower.includes(cleanQuery)) {
-      score += 600;
-      matchedConcepts.push('Title Phrase Match');
+    const mappedText = extractMappedColumnValues(book, mappedCols);
+
+    // 1. Control Panel Mapped Field Match (Highest Priority)
+    if (mappedText) {
+      if (mappedText === rawQuery) {
+        score += 3000;
+        matchReasons.push('Exact match on Control Panel connected column');
+      } else if (mappedText.includes(rawQuery)) {
+        score += 1800;
+        matchReasons.push('Connected column phrase match');
+      } else {
+        // Check token coverage in mappedText (handles reversed words and typos)
+        let mappedTokensFound = 0;
+        for (const qToken of queryTokens) {
+          if (mappedText.includes(qToken)) {
+            mappedTokensFound++;
+            score += 250;
+          } else {
+            // Check fuzzy match on mapped text words
+            for (const word of tokenizeText(mappedText)) {
+              if (fuzzyRatio(qToken, word) >= 0.72) {
+                mappedTokensFound++;
+                score += 180;
+                matchReasons.push(`Fuzzy match on connected column ('${qToken}' ≈ '${word}')`);
+                break;
+              }
+            }
+          }
+        }
+        if (queryTokens.length > 0 && mappedTokensFound === queryTokens.length) {
+          score += 1200;
+          matchReasons.push('All words matched in Control Panel connected column');
+        }
+      }
     }
 
-    if (authorLower && authorLower.includes(cleanQuery)) {
-      score += 400;
-      matchedConcepts.push('Author Match');
+    // 2. Exact Title / Phrase & Permutation Match
+    if (titleLower === rawQuery) {
+      score += 2500;
+      matchReasons.push('Exact Title Match');
+      matchedConcepts.push('Exact Title');
+    } else if (titleLower.includes(rawQuery)) {
+      score += 1500;
+      matchReasons.push('Title Phrase Match');
+      matchedConcepts.push('Title Substring');
+    } else {
+      // Check word permutation in Title (e.g. "Structures Data" vs "Data Structures")
+      const titleTokens = tokenizeText(titleLower);
+      let titleTokensMatched = 0;
+      for (const qToken of queryTokens) {
+        if (titleLower.includes(qToken)) {
+          titleTokensMatched++;
+        } else {
+          for (const tToken of titleTokens) {
+            if (fuzzyRatio(qToken, tToken) >= 0.72) {
+              titleTokensMatched++;
+              break;
+            }
+          }
+        }
+      }
+      if (queryTokens.length > 0 && titleTokensMatched === queryTokens.length) {
+        score += 1200;
+        matchReasons.push('All title words matched (reversed/permutation)');
+        matchedConcepts.push('Reversed Title Words');
+      } else if (titleTokensMatched > 0) {
+        score += titleTokensMatched * 200;
+      }
+
+      // Fuzzy ratio whole title vs query
+      const titleFuzzy = fuzzyRatio(rawQuery, titleLower);
+      if (titleFuzzy >= 0.70) {
+        score += Math.floor(titleFuzzy * 1000);
+        matchReasons.push(`Title spelling correction match (${Math.round(titleFuzzy * 100)}% similarity)`);
+      }
     }
 
-    // Token matches
-    let matchingTokensCount = 0;
-    for (const token of queryTokens) {
-      let tokenMatched = false;
-      if (titleLower.includes(token)) {
-        score += 50;
-        tokenMatched = true;
-        matchedConcepts.push(`Title: "${token}"`);
+    // 3. Author Match (exact, permutation, fuzzy)
+    if (authorLower) {
+      if (authorLower === rawQuery) {
+        score += 1200;
+        matchReasons.push('Exact Author Match');
+      } else if (authorLower.includes(rawQuery)) {
+        score += 800;
+        matchReasons.push('Author Match');
+      } else {
+        const authorFuzzy = fuzzyRatio(rawQuery, authorLower);
+        if (authorFuzzy >= 0.70) {
+          score += Math.floor(authorFuzzy * 700);
+          matchReasons.push(`Author typo match ('${rawQuery}' ≈ '${authorLower}')`);
+        }
       }
-      if (authorLower.includes(token)) {
-        score += 35;
-        tokenMatched = true;
-        matchedConcepts.push(`Author: "${token}"`);
-      }
-      if (subjectLower.includes(token)) {
-        score += 25;
-        tokenMatched = true;
-        matchedConcepts.push(`Subject: "${token}"`);
-      }
-      if (deptLower.includes(token)) {
-        score += 20;
-        tokenMatched = true;
-        matchedConcepts.push(`Department: "${token}"`);
-      }
-      if (keywordsStr.includes(token)) {
-        score += 20;
-        tokenMatched = true;
-        matchedConcepts.push(`Keyword: "${token}"`);
-      }
-      if (descLower.includes(token)) {
-        score += 15;
-        tokenMatched = true;
-      }
-      if (rawValuesStr.includes(token)) {
-        score += 15;
-        tokenMatched = true;
-        matchedConcepts.push(`Sheet Data match`);
-      }
-
-      if (tokenMatched) matchingTokensCount++;
     }
 
-    // Multi-token query bonus if all tokens match
-    if (matchingTokensCount === queryTokens.length && queryTokens.length > 0) {
-      score += 250;
+    // 4. Accession Number / ISBN / Barcode / Call Number Match
+    if (accessionLower.includes(rawQuery) || (rawQuery.length >= 3 && accessionLower.replace(/[^a-z0-9]/g, '').includes(rawQuery.replace(/[^a-z0-9]/g, '')))) {
+      score += 2200;
+      matchReasons.push(`Accession Number ${book.accessionNumber} Match`);
+    }
+    if (isbnLower && (isbnLower === rawQuery || isbnLower.replace(/[^0-9]/g, '').includes(rawQuery.replace(/[^0-9]/g, '')))) {
+      score += 2000;
+      matchReasons.push(`ISBN ${book.isbn} Match`);
     }
 
-    // Penalize multi-token queries where only 1 token matched when query has 2+ tokens
-    if (queryTokens.length >= 2 && matchingTokensCount < 2 && !titleLower.includes(cleanQuery)) {
-      score = Math.floor(score * 0.4);
+    // 5. Subject, Department, Keywords, Description & Raw CSV
+    for (const qToken of queryTokens) {
+      if (subjectLower.includes(qToken)) {
+        score += 120;
+        matchedConcepts.push(`Subject: ${book.subject}`);
+      }
+      if (deptLower.includes(qToken)) {
+        score += 100;
+        matchedConcepts.push(`Dept: ${book.department}`);
+      }
+      if (keywordsLower.includes(qToken)) {
+        score += 80;
+        matchedConcepts.push(`Keyword match`);
+      }
+      if (descLower.includes(qToken)) {
+        score += 60;
+      }
+      if (rawDataLower.includes(qToken) || customAttrsLower.includes(qToken)) {
+        score += 80;
+        matchReasons.push('Spreadsheet Data match');
+      }
     }
 
-    if (score >= 40) {
-      const confidence = Math.min(99, Math.max(50, Math.round(score > 300 ? 98 : (score > 150 ? 88 : score))));
+    if (score > 0) {
+      const confidenceScore = Math.min(99, Math.max(50, Math.round(score > 1000 ? 98 : (score > 500 ? 92 : (score > 200 ? 82 : (score > 100 ? 72 : 60))))));
+      const primaryReason = matchReasons.length > 0 ? matchReasons[0] : 'Matches query topic and keywords';
       const uniqueConcepts = Array.from(new Set(matchedConcepts));
-      scoredResults.push({
+
+      scoredItems.push({
         book,
-        score: confidence,
-        concepts: uniqueConcepts,
-        reason: `Matched concepts: ${uniqueConcepts.slice(0, 3).join(', ')}`
+        score: confidenceScore,
+        matchReason: primaryReason,
+        matchedConcepts: uniqueConcepts.length > 0 ? uniqueConcepts : tokenizeText(rawQuery)
       });
     }
   }
 
-  scoredResults.sort((a, b) => b.score - a.score);
+  // Sort by confidence score descending
+  scoredItems.sort((a, b) => b.score - a.score);
 
-  const topScore = scoredResults.length > 0 ? scoredResults[0].score : 0;
-
-  // Filter out low-confidence noise when strong matches are present
-  const highQualityResults = scoredResults.filter(item => {
-    if (topScore >= 90) {
-      return item.score >= Math.max(78, topScore * 0.82);
-    }
-    if (topScore >= 75) {
-      return item.score >= Math.max(68, topScore * 0.75);
-    }
-    return item.score >= 60;
-  });
-
-  return highQualityResults.map((item, index) => ({
+  return scoredItems.map((item, index) => ({
     book: item.book,
     confidenceScore: item.score,
-    matchReason: item.reason,
-    matchedConcepts: item.concepts,
+    matchReason: item.matchReason,
+    matchedConcepts: item.matchedConcepts,
     relevanceRank: index + 1
   }));
 }
@@ -406,15 +544,26 @@ app.get('/api/books', (req, res) => {
     scoped = booksCatalog.filter(b => b.collegeId === collegeId);
   }
 
-  const maxLimit = limit ? Math.min(Number(limit) || 300, 1000) : 500;
-  const pageNum = Math.max(Number(page) || 1, 1);
   const total = scoped.length;
+
+  // If no specific pagination is requested, return full catalog without artificial limits
+  if (!limit && !page) {
+    return res.json({
+      total,
+      page: 1,
+      pageSize: total,
+      books: scoped
+    });
+  }
+
+  const maxLimit = limit === 'all' ? total : Math.max(Number(limit) || 1000, 1);
+  const pageNum = Math.max(Number(page) || 1, 1);
   const paginated = scoped.slice((pageNum - 1) * maxLimit, pageNum * maxLimit);
 
   res.json({
     total,
     page: pageNum,
-    pageSize: maxLimit,
+    pageSize: paginated.length,
     books: paginated
   });
 });
@@ -681,11 +830,10 @@ app.delete('/api/books/college/:collegeId/clear', (req, res) => {
 // POST /api/search/exact - Title/Author/ISBN/Subject/CSV Sheet search
 app.post('/api/search/exact', (req, res) => {
   const { query, department, category, onlyAvailable, collegeId, limit, searchMappings: reqMappings } = req.body;
-  const cleanQuery = (query || '').toLowerCase().trim();
+  const cleanQuery = (query || '').trim();
 
   const targetCollege = collegesList.find(c => c.id === collegeId);
   const activeMappings = reqMappings || targetCollege?.searchMappings;
-  const nameCols = (activeMappings?.nameColumns || []).map((c: string) => c.toLowerCase().trim()).filter(Boolean);
 
   let filtered = booksCatalog;
 
@@ -705,123 +853,11 @@ app.post('/api/search/exact', (req, res) => {
   let results = filtered;
 
   if (cleanQuery) {
-    const stopWords = new Set(['book', 'books', 'the', 'and', 'for', 'with', 'show', 'me', 'get', 'find', 'search', 'shelf', 'shelves', 'which', 'where', 'that', 'from', 'have', 'need', 'about', 'want', 'list', 'all', 'any', 'a', 'an', 'in', 'on', 'at', 'to', 'of', 'is', 'it']);
-    let queryTokens = cleanQuery.split(/\s+/).filter(t => t.length > 1 && !stopWords.has(t));
-    if (queryTokens.length === 0 && cleanQuery.length > 0) {
-      queryTokens = [cleanQuery];
-    }
-
-    const scored: { book: Book; score: number }[] = [];
-
-    for (const book of filtered) {
-      let score = 0;
-      const title = (book.title || '').toLowerCase();
-      const author = (book.author || '').toLowerCase();
-      const accession = (book.accessionNumber || '').toLowerCase();
-      const isbn = (book.isbn || '').toLowerCase();
-      const subject = (book.subject || '').toLowerCase();
-      const dept = (book.department || '').toLowerCase();
-      const publisher = (book.publisher || '').toLowerCase();
-      const callNumber = (book.callNumber || '').toLowerCase();
-      const description = (book.description || '').toLowerCase();
-      const keywords = (book.keywords || []).map(k => k.toLowerCase()).join(' ');
-      const rawValues = Object.values(book.rawCsvData || {}).map(v => String(v).toLowerCase()).join(' ');
-      const customValues = Object.values(book.customAttributes || {}).map(v => String(v).toLowerCase()).join(' ');
-
-      // Extract specific connected Book Name column text if mapped by librarian in Control Panel
-      let mappedNameText = '';
-      if (nameCols.length > 0) {
-        for (const col of nameCols) {
-          if (col === 'title') mappedNameText += ' ' + title;
-          if (col === 'author') mappedNameText += ' ' + author;
-          if (book.rawCsvData) {
-            Object.entries(book.rawCsvData).forEach(([k, v]) => {
-              if (k.toLowerCase() === col || k.toLowerCase().includes(col)) mappedNameText += ' ' + String(v).toLowerCase();
-            });
-          }
-          if (book.customAttributes) {
-            Object.entries(book.customAttributes).forEach(([k, v]) => {
-              if (k.toLowerCase() === col || k.toLowerCase().includes(col)) mappedNameText += ' ' + String(v).toLowerCase();
-            });
-          }
-        }
-        mappedNameText = mappedNameText.trim();
-      }
-
-      // If mapped Name columns exist, score mapped column matches with top priority
-      if (mappedNameText) {
-        if (mappedNameText === cleanQuery) score += 2000;
-        else if (mappedNameText.includes(cleanQuery)) score += 1000;
-
-        for (const token of queryTokens) {
-          if (mappedNameText.includes(token)) score += 150;
-        }
-      } else {
-        // Standard unmapped search scoring fallback
-        if (title === cleanQuery) score += 1000;
-        else if (title.includes(cleanQuery)) score += 500;
-        
-        if (author === cleanQuery) score += 400;
-        else if (author.includes(cleanQuery)) score += 200;
-
-        if (accession.includes(cleanQuery) || isbn.includes(cleanQuery)) score += 400;
-        if (subject.includes(cleanQuery) || dept.includes(cleanQuery) || publisher.includes(cleanQuery) || callNumber.includes(cleanQuery)) score += 150;
-        if (rawValues.includes(cleanQuery) || customValues.includes(cleanQuery)) score += 150;
-      }
-
-      // Token matches across catalog
-      let matchingTokensCount = 0;
-      for (const token of queryTokens) {
-        let matchedInBook = false;
-        if (title.includes(token)) {
-          score += 60;
-          matchedInBook = true;
-        }
-        if (author.includes(token)) {
-          score += 40;
-          matchedInBook = true;
-        }
-        if (accession.includes(token) || isbn.includes(token) || subject.includes(token) || dept.includes(token)) {
-          score += 30;
-          matchedInBook = true;
-        }
-        if (keywords.includes(token) || rawValues.includes(token) || customValues.includes(token) || description.includes(token)) {
-          score += 20;
-          matchedInBook = true;
-        }
-        if (matchedInBook) matchingTokensCount++;
-      }
-
-      // If all query tokens matched in book, give big boost
-      if (matchingTokensCount === queryTokens.length && queryTokens.length > 0) {
-        score += 200;
-      }
-
-      if (score > 0) {
-        scored.push({ book, score });
-      }
-    }
-
-    scored.sort((a, b) => b.score - a.score);
-
-    const topScore = scored.length > 0 ? scored[0].score : 0;
-    const filteredScored = scored.filter(s => {
-      if (topScore >= 500) {
-        return s.score >= Math.max(300, topScore * 0.65);
-      }
-      if (topScore >= 200) {
-        return s.score >= Math.max(150, topScore * 0.6);
-      }
-      if (queryTokens.length >= 2) {
-        return s.score >= 120;
-      }
-      return s.score >= 50;
-    });
-
-    results = filteredScored.map(s => s.book);
+    const searchResults = performLocalSearch(cleanQuery, filtered, activeMappings);
+    results = searchResults.map(r => r.book);
   }
 
-  const maxLimit = Math.min(Number(limit) || 300, 1000);
+  const maxLimit = limit === 'all' ? results.length : (limit ? Math.max(Number(limit) || 1000, 1) : results.length);
 
   searchLogs.push({
     query: cleanQuery || 'All Catalog',
@@ -840,28 +876,24 @@ app.post('/api/search/exact', (req, res) => {
 // POST /api/search/ai - Natural Language AI Semantic Search Endpoint
 app.post('/api/search/ai', async (req, res) => {
   const startTime = Date.now();
-  const { query, collegeId } = req.body;
+  const { query, collegeId, searchMappings: reqMappings } = req.body;
 
   if (!query || typeof query !== 'string' || !query.trim()) {
     return res.status(400).json({ error: 'Query parameter is required' });
   }
 
   const userQuery = query.trim();
-
-  // Filter books catalog for this specific college
   const targetCollegeId = collegeId || 'col-gec-goa';
   const targetCollege = collegesList.find(c => c.id === targetCollegeId);
-  const activeMappings = req.body.searchMappings || targetCollege?.searchMappings;
-  const aiCols = (activeMappings?.aiColumns || []).map((c: string) => c.toLowerCase().trim()).filter(Boolean);
+  const activeMappings = reqMappings || targetCollege?.searchMappings;
 
   const collegeBooksCatalog = booksCatalog.filter(b => b.collegeId === targetCollegeId);
 
-  // Pre-filter top candidates based on local relevance scoring
-  const candidateResults = performLocalSearch(userQuery, collegeBooksCatalog);
-  let topCandidates = candidateResults.slice(0, 100).map(r => r.book);
+  // Compute local intelligent search results (Instant, zero API quota, handles typos, reversed words & Control Panel column mappings)
+  const localResults = performLocalSearch(userQuery, collegeBooksCatalog, activeMappings);
 
-  // If Gemini API Key is available, use Gemini for deep semantic understanding & ranking
-  if (process.env.GEMINI_API_KEY && topCandidates.length > 0) {
+  // If Gemini API Key is available, optionally refine search results if API call succeeds
+  if (process.env.GEMINI_API_KEY && localResults.length > 0) {
     try {
       const ai = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
@@ -872,67 +904,27 @@ app.post('/api/search/ai', async (req, res) => {
         }
       });
 
-      // Prepare candidate catalog overview for Gemini prompt including connected AI columns
-      const catalogSummary = topCandidates.map(b => {
-        let connectedFields: Record<string, string> = {};
-        if (aiCols.length > 0) {
-          aiCols.forEach(col => {
-            if (col === 'description' && b.description) connectedFields.description = b.description;
-            if (col === 'summary' && b.summary) connectedFields.summary = b.summary;
-            if (col === 'keywords' && b.keywords?.length) connectedFields.keywords = b.keywords.join(', ');
-            if (col === 'subject' && b.subject) connectedFields.subject = b.subject;
-            if (col === 'title' && b.title) connectedFields.title = b.title;
-            if (b.rawCsvData) {
-              Object.entries(b.rawCsvData).forEach(([k, v]) => {
-                if (k.toLowerCase() === col || k.toLowerCase().includes(col)) {
-                  connectedFields[k] = String(v);
-                }
-              });
-            }
-            if (b.customAttributes) {
-              Object.entries(b.customAttributes).forEach(([k, v]) => {
-                if (k.toLowerCase() === col || k.toLowerCase().includes(col)) {
-                  connectedFields[k] = String(v);
-                }
-              });
-            }
-          });
-        }
-
-        return {
-          id: b.id,
-          title: b.title,
-          subtitle: b.subtitle || '',
-          author: b.author,
-          department: b.department,
-          subject: b.subject,
-          description: b.description || '',
-          keywords: b.keywords || [],
-          connectedAiFields: Object.keys(connectedFields).length > 0 ? connectedFields : undefined,
-          shelfCode: b.location?.shelfCode || `${b.location?.almariNumber || 'A1'}-${b.location?.rowNumber || 'R1'}`,
-          accessionNumber: b.accessionNumber || ''
-        };
-      });
+      const topCandidates = localResults.slice(0, 50).map(r => r.book);
+      const catalogSummary = topCandidates.map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        department: b.department,
+        subject: b.subject,
+        description: b.description || '',
+        keywords: b.keywords || [],
+        accessionNumber: b.accessionNumber || ''
+      }));
 
       const prompt = `You are the AI Librarian assistant for a college library. 
-A student is asking for books using natural language: "${userQuery}".
-
-Students often describe topics in plain English or may have spelling mistakes (e.g. "I need a Fish Curry book", "macheen lernin", "Goa recipes", "Java interview preparation").
-
-Analyze the student query:
-1. Extract the core intent, topic keywords, and semantic concepts (e.g., if asking for "Fish Curry book", concepts are ['Fish', 'Cooking', 'Recipe', 'Goa', 'Seafood', 'Traditional Food']).
-2. Search through the library database provided below ONLY. Do NOT invent or hallucinate any books outside this catalog.
-3. For matching books, calculate a confidence score (0 to 100), explain why it matches, and list matched concepts.
-4. CRITICAL RELEVANCE RULE: ONLY return books in matchedBookIds if they are TRULY RELEVANT to the query (confidence score >= 75). If only 1 or 2 books in the catalog match (e.g., "Understanding Lost Kingdom"), return ONLY those 1 or 2 books. DO NOT return dozens of unrelated books that happen to share a single word like "Understanding" or "Lost".
-
-Library Catalog:
+A student searched for: "${userQuery}".
+Students may describe topics in plain English, have spelling mistakes, or inverted terms.
+Match this query against the catalog below ONLY:
 ${JSON.stringify(catalogSummary, null, 2)}
 
 Return a JSON object with:
 - extractedConcepts: array of semantic topic keywords inferred from query
-- matchedBookIds: array of objects with { id: string, confidenceScore: number, matchReason: string, matchedConcepts: string[] } ranked best match first.
-
-Return strictly JSON matching this structure.`;
+- matchedBookIds: array of { id: string, confidenceScore: number, matchReason: string } ranked best match first.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.6-flash',
@@ -954,11 +946,7 @@ Return strictly JSON matching this structure.`;
                   properties: {
                     id: { type: Type.STRING },
                     confidenceScore: { type: Type.NUMBER },
-                    matchReason: { type: Type.STRING },
-                    matchedConcepts: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING }
-                    }
+                    matchReason: { type: Type.STRING }
                   },
                   required: ['id', 'confidenceScore', 'matchReason']
                 }
@@ -970,49 +958,54 @@ Return strictly JSON matching this structure.`;
       });
 
       const parsed = JSON.parse(response.text || '{}');
-      const extractedConcepts: string[] = parsed.extractedConcepts || [];
-      const matchedList: any[] = parsed.matchedBookIds || [];
+      const geminiMatchedList: any[] = parsed.matchedBookIds || [];
+      const extractedConcepts: string[] = parsed.extractedConcepts || userQuery.split(/\s+/).filter(w => w.length > 2);
 
-      const results: AISearchResult[] = [];
-      const matchedIdsSet = new Set<string>();
+      if (geminiMatchedList.length > 0) {
+        const results: AISearchResult[] = [];
+        const matchedIdsSet = new Set<string>();
 
-      matchedList.forEach((item, index) => {
-        if (item.confidenceScore && item.confidenceScore < 70) return;
-        const book = collegeBooksCatalog.find(b => b.id === item.id);
-        if (book) {
-          matchedIdsSet.add(book.id);
-          results.push({
-            book,
-            confidenceScore: item.confidenceScore || 85,
-            matchReason: item.matchReason || 'Matches student search topic',
-            matchedConcepts: item.matchedConcepts || extractedConcepts,
-            relevanceRank: index + 1
+        geminiMatchedList.forEach((item, index) => {
+          const book = collegeBooksCatalog.find(b => b.id === item.id);
+          if (book && !matchedIdsSet.has(book.id)) {
+            matchedIdsSet.add(book.id);
+            results.push({
+              book,
+              confidenceScore: item.confidenceScore || 88,
+              matchReason: item.matchReason || 'Matches student search query',
+              matchedConcepts: extractedConcepts,
+              relevanceRank: index + 1
+            });
+          }
+        });
+
+        // Supplement with any high-scoring local matches
+        localResults.forEach(lr => {
+          if (!matchedIdsSet.has(lr.book.id) && lr.confidenceScore >= 75) {
+            matchedIdsSet.add(lr.book.id);
+            results.push(lr);
+          }
+        });
+
+        if (results.length > 0) {
+          const suggestedRelatedBooks = collegeBooksCatalog.filter(b => !matchedIdsSet.has(b.id)).slice(0, 3);
+          searchLogs.push({ query: userQuery, type: 'ai', timestamp: new Date().toISOString(), resultsCount: results.length, collegeId: targetCollegeId });
+
+          return res.json({
+            query: userQuery,
+            extractedConcepts,
+            results,
+            suggestedRelatedBooks: results.length === 0 ? suggestedRelatedBooks : undefined,
+            searchTimeMs: Date.now() - startTime
           });
         }
-      });
-
-      // Related suggestions if few or no matches
-      const suggestedRelatedBooks = collegeBooksCatalog.filter(b => !matchedIdsSet.has(b.id)).slice(0, 3);
-
-      searchLogs.push({ query: userQuery, type: 'ai', timestamp: new Date().toISOString(), resultsCount: results.length, collegeId: targetCollegeId });
-
-      const searchResponse: AISearchResponse = {
-        query: userQuery,
-        extractedConcepts,
-        results,
-        suggestedRelatedBooks: results.length === 0 ? suggestedRelatedBooks : undefined,
-        searchTimeMs: Date.now() - startTime
-      };
-
-      return res.json(searchResponse);
-
+      }
     } catch (err) {
-      console.error('Gemini AI Search API error, falling back to local semantic search:', err);
+      console.warn('Gemini AI Search API error or quota limit reached, falling back seamlessly to local fuzzy search:', err);
     }
   }
 
-  // Fallback local semantic search
-  const localResults = performLocalSearch(userQuery, collegeBooksCatalog);
+  // Local Intelligent Fuzzy Search Results (Zero API quota usage, handles typos, reversed terms, & mapped columns)
   const matchedIdsSet = new Set(localResults.map(r => r.book.id));
   const suggestedRelatedBooks = collegeBooksCatalog.filter(b => !matchedIdsSet.has(b.id)).slice(0, 3);
 

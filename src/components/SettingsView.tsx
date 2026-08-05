@@ -36,7 +36,11 @@ import {
   Box,
   LayoutGrid,
   FileText,
-  Zap
+  Zap,
+  Sun,
+  Moon,
+  Download,
+  Smartphone
 } from 'lucide-react';
 import { College, Book } from '../types';
 import { useTheme, THEME_PRESETS, ColorTheme } from '../context/ThemeContext';
@@ -49,6 +53,7 @@ interface SettingsViewProps {
   onOpenQRModal?: () => void;
   onOpenBarcodeModal?: () => void;
   onOpenPublicKiosk?: () => void;
+  onOpenInstallModal?: () => void;
   books?: Book[];
 }
 
@@ -60,9 +65,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onOpenQRModal,
   onOpenBarcodeModal,
   onOpenPublicKiosk,
+  onOpenInstallModal,
   books = []
 }) => {
-  const { colorTheme, setColorTheme, currentPreset } = useTheme();
+  const { theme, toggleTheme, colorTheme, setColorTheme, currentPreset } = useTheme();
 
   // Modal State for College Info Editor, Theme Selector & Control Panel Modals
   const [isCollegeModalOpen, setIsCollegeModalOpen] = useState(false);
@@ -511,6 +517,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
 
+        {/* Option 3: Light/Dark Display Mode & PWA Installation */}
+        <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl flex flex-col justify-between space-y-5 transition-all duration-500`}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className={`w-12 h-12 rounded-2xl ${currentPreset.buttonBg} flex items-center justify-center shadow-lg`}>
+                {theme === 'dark' ? <Moon className="w-6 h-6 text-amber-300" /> : <Sun className="w-6 h-6 text-amber-500" />}
+              </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${currentPreset.badgeBg}`}>
+                {theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+              </span>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Display & App Installation
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Toggle light/dark appearance and install as standalone mobile or desktop app.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`p-3.5 ${currentPreset.innerCardBg} ${currentPreset.buttonRadius} border ${currentPreset.borderColor} flex items-center justify-center gap-2 text-xs font-extrabold text-slate-800 dark:text-slate-200 hover:scale-[1.02] transition-all shadow-xs`}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+                <span>{theme === 'dark' ? 'Switch Light' : 'Switch Dark'}</span>
+              </button>
+
+              {onOpenInstallModal ? (
+                <button
+                  type="button"
+                  onClick={onOpenInstallModal}
+                  className={`p-3.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} text-white flex items-center justify-center gap-2 text-xs font-extrabold shadow-md hover:scale-[1.02] active:scale-95 transition-all`}
+                >
+                  <Download className="w-4 h-4 animate-bounce" />
+                  <span>Install App</span>
+                </button>
+              ) : (
+                <div className={`p-3.5 ${currentPreset.innerCardBg} ${currentPreset.buttonRadius} border ${currentPreset.borderColor} flex items-center justify-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400`}>
+                  <Smartphone className="w-4 h-4 text-emerald-500" />
+                  <span>App Ready</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Option 3: Account & Session (Sign Out / Change Department) */}
@@ -880,6 +936,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
                       Configure PYQ papers link & temporary dynamic event link for Find Page
+                    </span>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsControlPanelModalOpen(false);
+                  if (onOpenQRModal) onOpenQRModal();
+                }}
+                className={`w-full p-3.5 rounded-xl border ${currentPreset.cardBorder} hover:border-purple-400 dark:hover:border-purple-500 bg-slate-50/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left group`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg ${currentPreset.buttonBg} flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform`}>
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                      Entrance Gate Pass QR & Public Link
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                      Open Cute Entrance QR Code linked directly to Public Kiosk catalog view
                     </span>
                   </div>
                 </div>
@@ -1684,7 +1764,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const publicUrl = `${window.location.origin}${window.location.pathname}?public=true`;
+                  const publicUrl = `${window.location.origin}${window.location.pathname}?collegeId=${currentCollege?.id || 'col-gec-goa'}&public=true`;
                   navigator.clipboard.writeText(publicUrl);
                   setCopiedPublicLink(true);
                   setTimeout(() => setCopiedPublicLink(false), 2500);

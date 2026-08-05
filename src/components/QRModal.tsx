@@ -29,7 +29,7 @@ export const QRModal: React.FC<QRModalProps> = ({
   const collegeId = currentCollege?.id || 'col-gec-goa';
   const collegeName = currentCollege?.name || 'Goa Engineering College';
   const collegeCode = currentCollege?.code || 'GEC-LIB';
-  const publicPageUrl = `${window.location.origin}?collegeId=${collegeId}`;
+  const publicPageUrl = `${window.location.origin}${window.location.pathname}?collegeId=${collegeId}&public=true`;
 
   return (
     <motion.div

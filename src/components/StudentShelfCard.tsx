@@ -28,7 +28,7 @@ export const StudentShelfCard: React.FC<StudentShelfCardProps> = ({ book, aiResu
         {aiResult && (
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400">
-              {aiResult.matchScore}% AI Match
+              {aiResult.confidenceScore || (aiResult as any).matchScore || 90}% Search Match
             </span>
             <span className="text-[10px] text-slate-500 font-mono">
               Call: {book.callNumber}
@@ -44,9 +44,9 @@ export const StudentShelfCard: React.FC<StudentShelfCardProps> = ({ book, aiResu
         </p>
       </div>
 
-      {aiResult && aiResult.reason && (
+      {aiResult && (aiResult.matchReason || (aiResult as any).reason) && (
         <p className="text-xs text-slate-600 dark:text-slate-300 bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 italic">
-          "{aiResult.reason}"
+          "{aiResult.matchReason || (aiResult as any).reason}"
         </p>
       )}
 

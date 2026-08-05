@@ -253,6 +253,9 @@ function AppContent({
                       url.searchParams.set('public', 'true');
                       window.history.replaceState({}, '', url.toString());
                     }}
+                    onOpenInstallModal={() => {
+                      alert("To install this app on your phone or PC:\n1. Tap your browser menu (⋮ or Share icon)\n2. Select 'Add to Home Screen' or 'Install App'");
+                    }}
                   />
                 )}
               </div>
