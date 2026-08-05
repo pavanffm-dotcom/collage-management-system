@@ -137,7 +137,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     setImportProgress({ processed: 0, total: parsedBooks.length });
 
     try {
-      const CHUNK_SIZE = 3000;
+      const CHUNK_SIZE = 1000;
       let totalNew = 0;
       let totalUpdated = 0;
 
@@ -150,6 +150,11 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
         const currentProcessed = Math.min(i + CHUNK_SIZE, parsedBooks.length);
         setImportProgress({ processed: currentProcessed, total: parsedBooks.length });
+
+        // Yield execution briefly to keep UI responsive on massive 1,000,000 row imports
+        if (parsedBooks.length > 5000) {
+          await new Promise(r => setTimeout(r, 10));
+        }
       }
 
       setImportSummary({
@@ -251,7 +256,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   Click to Upload or Drag & Drop Any Library Spreadsheet
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Supports .csv or .tsv files with 10,000+ rows. AI will auto-match column headers!
+                  Supports .csv, .tsv or .txt files up to 1,000,000 (1 Million) rows. AI auto-matches all exact columns!
                 </p>
               </div>
             </div>

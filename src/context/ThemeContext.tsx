@@ -351,8 +351,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Apply the active preset pagebg and pinning parameters
     const newClasses = preset.pageBg.split(' ').filter(Boolean);
-    document.body.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-fixed', 'bg-no-repeat');
-    document.documentElement.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-fixed', 'bg-no-repeat');
+    document.body.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-no-repeat');
+    document.documentElement.classList.add(...newClasses, 'transition-colors', 'duration-500', 'min-h-screen', 'bg-no-repeat');
 
     // Dynamically update mobile browser/PWA status bar theme-color
     let themeMeta = document.querySelector('meta[name="theme-color"]');

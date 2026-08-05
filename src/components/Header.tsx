@@ -93,19 +93,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      {/* Mobile & Tablet Header (Hidden on Desktop ONLY if logged in) */}
-      <header className={`${authUser ? 'lg:hidden' : ''} sticky top-0 z-40 ${currentPreset.headerBg} border-b ${currentPreset.borderColor} backdrop-blur-2xl transition-all duration-500`}>
-        <div className="max-w-7xl mx-auto px-4 h-11 sm:h-12 flex items-center justify-center">
-          
-          {/* Active Department Badge (Clean, Centered Header Text) */}
-          <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-500/10 dark:bg-zinc-800/60 border border-slate-200/30 dark:border-zinc-700/50 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest select-none">
-            <CurrentDeptIcon className={`w-3.5 h-3.5 ${currentDeptObj.color}`} />
-            <span>{currentDeptObj.name}</span>
-          </div>
-
-        </div>
-      </header>
-
       {/* YouTube-Style Fixed Mobile Bottom Navigation Bar */}
       {selectedDept === 'library' && (
         <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-[60] ${currentPreset.headerBg} border-t ${currentPreset.borderColor} backdrop-blur-2xl px-2 py-1.5 shadow-2xl flex items-center justify-around select-none transition-all duration-500`}>

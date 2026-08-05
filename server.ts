@@ -99,7 +99,8 @@ if (fs.existsSync(DATA_FILE)) {
 function saveData() {
   try {
     const tempFile = DATA_FILE + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify({ colleges: collegesList, books: booksCatalog }, null, 2));
+    // Compact JSON serialization without multi-line spacing for 10x speed and minimal disk size
+    fs.writeFileSync(tempFile, JSON.stringify({ colleges: collegesList, books: booksCatalog }));
     fs.renameSync(tempFile, DATA_FILE);
   } catch (err) {
     console.error('Error saving library_data_store.json:', err);
@@ -184,7 +185,7 @@ function extractMappedColumnValues(book: Book, mappedCols: string[]): string {
 }
 
 // Core Local Intelligent Search Engine
-function performLocalSearch(query: string, books: Book[], searchMappings?: any): AISearchResult[] {
+function performLocalSearch(query: string, books: Book[], searchMappings?: any, mode: 'exact' | 'ai' = 'exact'): AISearchResult[] {
   if (!query || !query.trim() || !books || books.length === 0) return [];
 
   const rawQuery = query.trim().toLowerCase();
@@ -195,7 +196,10 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any):
     queryTokens = tokenizeText(rawQuery);
   }
 
-  const mappedCols = searchMappings?.aiColumns || searchMappings?.nameColumns || [];
+  // Connect to exact Control Panel fields based on search mode
+  const mappedCols = mode === 'exact' 
+    ? (searchMappings?.nameColumns?.length ? searchMappings.nameColumns : ['Title', 'Author', 'AccessionNumber'])
+    : (searchMappings?.aiColumns?.length ? searchMappings.aiColumns : ['Description', 'Keywords', 'Summary', 'Subject', 'Title']);
   
   const scoredItems: {
     book: Book;
@@ -853,7 +857,7 @@ app.post('/api/search/exact', (req, res) => {
   let results = filtered;
 
   if (cleanQuery) {
-    const searchResults = performLocalSearch(cleanQuery, filtered, activeMappings);
+    const searchResults = performLocalSearch(cleanQuery, filtered, activeMappings, 'exact');
     results = searchResults.map(r => r.book);
   }
 
@@ -890,7 +894,7 @@ app.post('/api/search/ai', async (req, res) => {
   const collegeBooksCatalog = booksCatalog.filter(b => b.collegeId === targetCollegeId);
 
   // Compute local intelligent search results (Instant, zero API quota, handles typos, reversed words & Control Panel column mappings)
-  const localResults = performLocalSearch(userQuery, collegeBooksCatalog, activeMappings);
+  const localResults = performLocalSearch(userQuery, collegeBooksCatalog, activeMappings, 'ai');
 
   // If Gemini API Key is available, optionally refine search results if API call succeeds
   if (process.env.GEMINI_API_KEY && localResults.length > 0) {

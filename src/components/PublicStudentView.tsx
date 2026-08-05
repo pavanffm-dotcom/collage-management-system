@@ -197,7 +197,7 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 pb-28 transition-colors duration-500`}>
       
       {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 sm:pt-3 space-y-5">
         
         {/* Search Header Box */}
         <motion.div 
@@ -386,16 +386,6 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
 
             {/* 🚀 QUICK STUDENT ACCESS & DYNAMIC REDIRECT LINKS SECTION */}
             <div className="pt-4 border-t border-slate-200/40 dark:border-slate-800/60 space-y-3">
-              <div className="flex items-center justify-between text-left px-1">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Link2 className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Student Quick Links & Direct Access</span>
-                </span>
-                <span className="text-[10px] font-bold text-amber-500 font-mono">
-                  Live Redirect
-                </span>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Previous Year Question Papers (PYQ) Button */}
                 <button
@@ -411,18 +401,15 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                        {quickLinks.pyqTitle || 'Previous Year Question Papers'}
-                      </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                        Direct Access to PYQ Bank
+                      <span className="text-sm font-black text-slate-900 dark:text-white block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        PYQ
                       </span>
                     </div>
                   </div>
                   <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </button>
 
-                {/* 2. Dynamic Event / Temporary Notice Link Button */}
+                {/* 2. Notice Button */}
                 {quickLinks.dynamicEnabled && (
                   <button
                     type="button"
@@ -437,11 +424,8 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                         <Zap className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-xs font-black text-slate-900 dark:text-white block group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                          {quickLinks.dynamicTitle || 'Notice & Dynamic Link'}
-                        </span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                          Temporary Event & Notice Link
+                        <span className="text-sm font-black text-slate-900 dark:text-white block group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                          Notice
                         </span>
                       </div>
                     </div>
