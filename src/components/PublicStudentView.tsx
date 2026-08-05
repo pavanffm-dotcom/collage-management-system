@@ -198,9 +198,6 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   return (
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 pb-28 transition-colors duration-500`}>
       
-      {/* Floating Fullscreen Mode Trigger Button */}
-      <FullscreenButton variant="floating" />
-
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-2 sm:px-6 pt-1 sm:pt-3 space-y-4">
         
@@ -222,7 +219,6 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                 Search books by title or describe your query in conversational English.
               </p>
             </div>
-            <FullscreenButton variant="button" className="hidden sm:flex shrink-0" />
           </div>
 
           {/* Search Mode Tabs with layoutId for fluid active tab sliding */}

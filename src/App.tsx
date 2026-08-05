@@ -8,6 +8,7 @@ import { QRModal } from './components/QRModal';
 import { BarcodeShelfMapperModal } from './components/BarcodeShelfMapperModal';
 import { ThemeModal } from './components/ThemeModal';
 import { HomePortal } from './components/HomePortal';
+import { YouTubeFullscreenManager } from './components/YouTubeFullscreenManager';
 import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode, Lock } from 'lucide-react';
 
 // Departments View imports
@@ -571,6 +572,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <YouTubeFullscreenManager />
       <AppContent
         colleges={colleges}
         currentCollege={currentCollege}
