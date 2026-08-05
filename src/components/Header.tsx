@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { College } from '../types';
+import { FullscreenButton } from './FullscreenButton';
 
 interface HeaderProps {
   currentCollege: College | null;
@@ -396,11 +397,14 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Theme Options & Theme Toggles row */}
           <div className="flex items-center justify-between gap-1.5">
             
+            {/* Fullscreen Mode Button */}
+            <FullscreenButton variant="icon" className="w-10 h-10 flex items-center justify-center p-0 shrink-0" />
+
             {/* Theme customization shortcut */}
             {onOpenThemeModal && (
               <button
                 onClick={onOpenThemeModal}
-                className={`w-1/2 p-2 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} transition-all flex items-center justify-center shrink-0 hover:scale-[1.02] border ${currentPreset.borderColor}`}
+                className={`flex-1 p-2 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} transition-all flex items-center justify-center shrink-0 hover:scale-[1.02] border ${currentPreset.borderColor}`}
                 title="Customize Theme"
               >
                 <Palette className={`w-4 h-4 ${currentPreset.accentText}`} />

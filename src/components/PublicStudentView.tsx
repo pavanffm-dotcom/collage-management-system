@@ -8,6 +8,8 @@ import { DirectBarcodeBorrowModal } from './DirectBarcodeBorrowModal';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { FullscreenButton } from './FullscreenButton';
+
 interface PublicStudentViewProps {
   currentCollege: College | null;
   colleges: College[];
@@ -196,27 +198,31 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
   return (
     <div className={`min-h-screen ${currentPreset.pageBg} text-slate-900 dark:text-slate-100 pb-28 transition-colors duration-500`}>
       
+      {/* Floating Fullscreen Mode Trigger Button */}
+      <FullscreenButton variant="floating" />
+
       {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 sm:pt-3 space-y-5">
+      <main className="max-w-4xl mx-auto px-2 sm:px-6 pt-1 sm:pt-3 space-y-4">
         
         {/* Search Header Box */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-          className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-6 sm:p-8 text-center space-y-5 transition-all duration-500`}
+          className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-4 sm:p-8 text-center space-y-4 transition-all duration-500`}
         >
           
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200/20 pb-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200/20 pb-3">
             <div className="text-left">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1.5 flex items-center gap-2">
-                <BookOpen className={`w-7 h-7 ${currentPreset.accentText}`} />
+              <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+                <BookOpen className={`w-6 h-6 sm:w-7 sm:h-7 ${currentPreset.accentText}`} />
                 <span>Smart AI Finder</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md font-medium">
                 Search books by title or describe your query in conversational English.
               </p>
             </div>
+            <FullscreenButton variant="button" className="hidden sm:flex shrink-0" />
           </div>
 
           {/* Search Mode Tabs with layoutId for fluid active tab sliding */}

@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { College, Book } from '../types';
 import { useTheme, THEME_PRESETS, ColorTheme } from '../context/ThemeContext';
+import { FullscreenButton } from './FullscreenButton';
 
 interface SettingsViewProps {
   currentCollege: College | null;
@@ -538,7 +539,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -547,6 +548,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
                 <span>{theme === 'dark' ? 'Switch Light' : 'Switch Dark'}</span>
               </button>
+
+              <FullscreenButton variant="button" className="w-full justify-center p-3.5" />
 
               {onOpenInstallModal ? (
                 <button

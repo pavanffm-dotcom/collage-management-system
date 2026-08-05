@@ -12,7 +12,8 @@
   "start_url": "/",
   "background_color": "#090d16",
   "theme_color": "#090d16",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "portrait-primary",
   "description": "Library Book Scanner, Attendance & Smart College Management System"
 }
