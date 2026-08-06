@@ -306,7 +306,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'public' | 'admin'>(() => {
     return (localStorage.getItem('smart_cms_active_view') as 'public' | 'admin') || 'admin';
   });
-  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>(() => {
+  const [adminTab, setAdminTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer'>(() => {
     return (localStorage.getItem('smart_cms_admin_tab') as any) || 'add';
   });
   const [isPublicKioskMode, setIsPublicKioskMode] = useState<boolean>(() => {

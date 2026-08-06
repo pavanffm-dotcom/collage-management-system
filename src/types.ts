@@ -107,3 +107,52 @@ export interface IssuedBook {
   };
 }
 
+export interface MapElement {
+  id: string;
+  type: 
+    | 'room' | 'wall' | 'door' | 'window' | 'entrance' | 'exit' | 'corridor' | 'hall'
+    | 'almari' | 'rack' | 'table' | 'chair' | 'sofa' | 'computer' | 'printer' | 'reception' | 'desk' | 'staff_room' | 'office' | 'discussion_room' | 'study_area'
+    | 'emergency_exit' | 'fire_extinguisher' | 'cctv' | 'first_aid' | 'alarm'
+    | 'path' | 'arrow' | 'direction_marker'
+    | 'rectangle' | 'circle' | 'line' | 'text' | 'label' | 'icon' | 'facility';
+  
+  label: string;
+  code?: string; // Short ID e.g. "SHELF-014", "A3", "ENTRANCE"
+  shelfId?: string; // Unique Shelf ID e.g. "SHELF-001", "SHELF-014"
+  shelfNumber?: number | string;
+  rackNumber?: string;
+  floor?: string;
+  section?: string;
+  category?: string;
+  capacity?: number;
+  description?: string;
+  almariNum?: number;
+
+  // Geometry (Canvas coordinates)
+  x: number; // px or %
+  y: number; // px or %
+  width: number; // px or %
+  height: number; // px or %
+  rotation?: number; // 0-360 deg
+  zIndex?: number;
+
+  // Visual Styling & Colors
+  fillColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  textColor?: string;
+  fontSize?: number;
+  opacity?: number; // 0.1 - 1.0
+  cornerRadius?: number; // px
+  hasShadow?: boolean;
+  color?: 'wood' | 'emerald' | 'cyan' | 'indigo' | 'violet' | 'rose' | 'amber' | 'slate' | string;
+
+  // Metadata & Grouping
+  isLocked?: boolean;
+  groupId?: string;
+  icon?: string;
+  department?: string;
+  subjects?: string;
+}
+
+

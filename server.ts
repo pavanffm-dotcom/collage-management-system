@@ -80,6 +80,27 @@ let booksCatalog: Book[] = INITIAL_BOOKS.map(b => ({
   collegeId: b.collegeId || 'col-gec-goa'
 }));
 
+// In-Memory Search Cache & Fast Index Structures
+const searchResultsCache = new Map<string, { total: number; books: any[]; rawResults?: AISearchResult[]; timestamp: number }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function clearSearchCache() {
+  searchResultsCache.clear();
+}
+
+let indexedCollegeId = '';
+let exactTitleIndex = new Map<string, Book[]>();
+let exactAccessionIndex = new Map<string, Book[]>();
+let exactIsbnIndex = new Map<string, Book[]>();
+
+function invalidateIndexes() {
+  indexedCollegeId = '';
+  exactTitleIndex.clear();
+  exactAccessionIndex.clear();
+  exactIsbnIndex.clear();
+  clearSearchCache();
+}
+
 // Load persisted library data from disk if exists
 if (fs.existsSync(DATA_FILE)) {
   try {
@@ -98,6 +119,7 @@ if (fs.existsSync(DATA_FILE)) {
 
 function saveData() {
   try {
+    invalidateIndexes();
     const tempFile = DATA_FILE + '.tmp';
     // Compact JSON serialization without multi-line spacing for 10x speed and minimal disk size
     fs.writeFileSync(tempFile, JSON.stringify({ colleges: collegesList, books: booksCatalog }));
@@ -110,35 +132,62 @@ function saveData() {
 // Analytics & Search Logs (Scoped by college)
 const searchLogs: { query: string; type: 'ai' | 'exact'; timestamp: string; resultsCount: number; collegeId: string }[] = [];
 
-// 🔍 Advanced Local Search Engine with Fuzzy Matching, Word-Permutation & Control Panel Linker Support
-function levenshteinDistance(a: string, b: string): number {
+// 🔍 High-Performance Search Engine with Fast Levenshtein, Indexing, and Caching
+function fastLevenshteinDistance(a: string, b: string, maxDistance?: number): number {
   if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const matrix: number[][] = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        );
-      }
-    }
+  const lenA = a.length;
+  const lenB = b.length;
+  if (lenA === 0) return lenB;
+  if (lenB === 0) return lenA;
+
+  const absDiff = Math.abs(lenA - lenB);
+  if (maxDistance !== undefined && absDiff > maxDistance) {
+    return maxDistance + 1;
   }
-  return matrix[b.length][a.length];
+
+  let row0 = new Int32Array(lenB + 1);
+  let row1 = new Int32Array(lenB + 1);
+
+  for (let i = 0; i <= lenB; i++) row0[i] = i;
+
+  for (let i = 0; i < lenA; i++) {
+    row1[0] = i + 1;
+    let minInRow = row1[0];
+
+    for (let j = 0; j < lenB; j++) {
+      const cost = a.charCodeAt(i) === b.charCodeAt(j) ? 0 : 1;
+      const val = Math.min(row1[j] + 1, row0[j + 1] + 1, row0[j] + cost);
+      row1[j + 1] = val;
+      if (val < minInRow) minInRow = val;
+    }
+
+    if (maxDistance !== undefined && minInRow > maxDistance) {
+      return maxDistance + 1;
+    }
+
+    const temp = row0;
+    row0 = row1;
+    row1 = temp;
+  }
+
+  return row0[lenB];
 }
 
 function fuzzyRatio(a: string, b: string): number {
   if (!a || !b) return 0;
-  const dist = levenshteinDistance(a.toLowerCase(), b.toLowerCase());
-  const maxLen = Math.max(a.length, b.length);
+  if (a === b) return 1;
+  const lenA = a.length;
+  const lenB = b.length;
+  const maxLen = Math.max(lenA, lenB);
   if (maxLen === 0) return 1;
+
+  // Length difference guard: if length difference > 25%, ratio can't meet 0.75 threshold
+  if (Math.abs(lenA - lenB) / maxLen > 0.25) return 0;
+
+  const maxAllowedDist = Math.floor(maxLen * 0.25);
+  const dist = fastLevenshteinDistance(a.toLowerCase(), b.toLowerCase(), maxAllowedDist);
+  if (dist > maxAllowedDist) return 0;
+
   return 1 - dist / maxLen;
 }
 
@@ -146,6 +195,81 @@ function tokenizeText(text: string): string[] {
   if (!text) return [];
   const cleaned = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
   return cleaned.split(/\s+/).filter(t => t.length > 0);
+}
+
+interface BookSearchFields {
+  titleLower: string;
+  authorLower: string;
+  accessionLower: string;
+  accessionClean: string;
+  isbnLower: string;
+  isbnClean: string;
+  callNumberLower: string;
+  subjectLower: string;
+  deptLower: string;
+  descLower: string;
+  keywordsLower: string;
+  rawCsvTitle: string;
+  rawDataLower: string;
+  customAttrsLower: string;
+  titleTokens: string[];
+}
+
+function getBookSearchFields(book: Book): BookSearchFields {
+  if ((book as any)._searchFields) {
+    return (book as any)._searchFields;
+  }
+
+  const titleLower = (book.title || '').trim().toLowerCase();
+  const authorLower = (book.author || '').trim().toLowerCase();
+  const accessionLower = (book.accessionNumber || '').trim().toLowerCase();
+  const accessionClean = accessionLower.replace(/[^a-z0-9]/g, '');
+  const isbnLower = (book.isbn || '').trim().toLowerCase();
+  const isbnClean = isbnLower.replace(/[^0-9]/g, '');
+  const callNumberLower = (book.callNumber || '').trim().toLowerCase();
+  const subjectLower = (book.subject || '').trim().toLowerCase();
+  const deptLower = (book.department || '').trim().toLowerCase();
+  const descLower = ((book.description || '') + ' ' + (book.summary || '')).trim().toLowerCase();
+  const keywordsLower = (book.keywords || []).map(k => k.trim().toLowerCase()).join(' ');
+
+  const rawCsvTitle = book.rawCsvData ? String(book.rawCsvData.title || book.rawCsvData.Title || book.rawCsvData.BookTitle || book.rawCsvData['Book Name'] || '').trim().toLowerCase() : '';
+  
+  let rawDataLower = '';
+  if (book.rawCsvData) {
+    for (const k in book.rawCsvData) {
+      rawDataLower += ' ' + String(book.rawCsvData[k]).trim().toLowerCase();
+    }
+  }
+
+  let customAttrsLower = '';
+  if (book.customAttributes) {
+    for (const k in book.customAttributes) {
+      customAttrsLower += ' ' + String(book.customAttributes[k]).trim().toLowerCase();
+    }
+  }
+
+  const titleTokens = tokenizeText(titleLower);
+
+  const fields: BookSearchFields = {
+    titleLower,
+    authorLower,
+    accessionLower,
+    accessionClean,
+    isbnLower,
+    isbnClean,
+    callNumberLower,
+    subjectLower,
+    deptLower,
+    descLower,
+    keywordsLower,
+    rawCsvTitle,
+    rawDataLower,
+    customAttrsLower,
+    titleTokens
+  };
+
+  (book as any)._searchFields = fields;
+  return fields;
 }
 
 // Extracts values from a book specifically corresponding to Control Panel mapped columns
@@ -190,6 +314,7 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
 
   const rawQuery = query.trim().toLowerCase();
   const normalizedQuery = rawQuery.replace(/\s+/g, ' ');
+  const normClean = normalizedQuery.replace(/[^a-z0-9]/g, '');
 
   const stopWords = new Set(['book', 'books', 'the', 'and', 'for', 'with', 'show', 'me', 'get', 'find', 'search', 'shelf', 'shelves', 'which', 'where', 'that', 'from', 'have', 'need', 'about', 'want', 'list', 'all', 'any', 'a', 'an', 'in', 'on', 'at', 'to', 'of', 'is', 'it', 'please', 'can', 'you', 'give']);
   
@@ -210,63 +335,52 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
     matchedConcepts: string[];
   }[] = [];
 
-  for (const book of books) {
+  for (let i = 0; i < books.length; i++) {
+    const book = books[i];
+    const sf = getBookSearchFields(book);
     let score = 0;
     const matchReasons: string[] = [];
     const matchedConcepts: string[] = [];
-
-    const titleLower = (book.title || '').trim().toLowerCase();
-    const authorLower = (book.author || '').trim().toLowerCase();
-    const accessionLower = (book.accessionNumber || '').trim().toLowerCase();
-    const isbnLower = (book.isbn || '').trim().toLowerCase();
-    const callNumberLower = (book.callNumber || '').trim().toLowerCase();
-    const subjectLower = (book.subject || '').trim().toLowerCase();
-    const deptLower = (book.department || '').trim().toLowerCase();
-    const descLower = ((book.description || '') + ' ' + (book.summary || '')).trim().toLowerCase();
-    const keywordsLower = (book.keywords || []).map(k => k.trim().toLowerCase()).join(' ');
-
-    const rawCsvTitle = book.rawCsvData ? String(book.rawCsvData.title || book.rawCsvData.Title || book.rawCsvData.BookTitle || book.rawCsvData['Book Name'] || '').trim().toLowerCase() : '';
-    const rawDataLower = Object.values(book.rawCsvData || {}).map(v => String(v).trim().toLowerCase()).join(' ');
-    const customAttrsLower = Object.values(book.customAttributes || {}).map(v => String(v).trim().toLowerCase()).join(' ');
 
     const mappedText = extractMappedColumnValues(book, mappedCols).trim().toLowerCase();
 
     // 1. EXACT & HIGH PRIORITY MATCHES (Tier 1: 30,000 - 100,000 points)
     
     // 1a. Exact Title Match
-    if (titleLower === normalizedQuery || (rawCsvTitle && rawCsvTitle === normalizedQuery)) {
+    if (sf.titleLower === normalizedQuery || (sf.rawCsvTitle && sf.rawCsvTitle === normalizedQuery)) {
       score += 100000;
       matchReasons.push('Exact Title Match');
       matchedConcepts.push('Exact Title');
     } 
     // 1b. Title Starts With Query
-    else if (titleLower.startsWith(normalizedQuery) || (rawCsvTitle && rawCsvTitle.startsWith(normalizedQuery))) {
+    else if (sf.titleLower.startsWith(normalizedQuery) || (sf.rawCsvTitle && sf.rawCsvTitle.startsWith(normalizedQuery))) {
       score += 60000;
       matchReasons.push('Title Prefix Match');
       matchedConcepts.push('Title Prefix');
     }
     // 1c. Title Contains Full Query Phrase
-    else if (titleLower.includes(normalizedQuery) || (rawCsvTitle && rawCsvTitle.includes(normalizedQuery))) {
+    else if (sf.titleLower.includes(normalizedQuery) || (sf.rawCsvTitle && sf.rawCsvTitle.includes(normalizedQuery))) {
       score += 40000;
       matchReasons.push('Title Phrase Match');
       matchedConcepts.push('Title Substring');
     }
 
     // 1d. Exact Accession / ISBN / Call Number Match
-    if (accessionLower && (accessionLower === normalizedQuery || accessionLower.replace(/[^a-z0-9]/g, '') === normalizedQuery.replace(/[^a-z0-9]/g, ''))) {
+    if (sf.accessionLower && (sf.accessionLower === normalizedQuery || (normClean.length > 0 && sf.accessionClean === normClean))) {
       score += 90000;
       matchReasons.push(`Accession Number ${book.accessionNumber} Match`);
-    } else if (accessionLower && accessionLower.includes(normalizedQuery)) {
+    } else if (sf.accessionLower && sf.accessionLower.includes(normalizedQuery)) {
       score += 35000;
       matchReasons.push('Accession Substring Match');
     }
 
-    if (isbnLower && (isbnLower === normalizedQuery || isbnLower.replace(/[^0-9]/g, '') === normalizedQuery.replace(/[^0-9]/g, ''))) {
+    const normDigits = normalizedQuery.replace(/[^0-9]/g, '');
+    if (sf.isbnLower && (sf.isbnLower === normalizedQuery || (normDigits.length > 0 && sf.isbnClean === normDigits))) {
       score += 90000;
       matchReasons.push(`ISBN ${book.isbn} Match`);
     }
 
-    if (callNumberLower && callNumberLower === normalizedQuery) {
+    if (sf.callNumberLower && sf.callNumberLower === normalizedQuery) {
       score += 85000;
       matchReasons.push('Call Number Match');
     }
@@ -283,23 +397,22 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
     }
 
     // 1f. Exact Author Match
-    if (authorLower === normalizedQuery) {
+    if (sf.authorLower === normalizedQuery) {
       score += 50000;
       matchReasons.push('Exact Author Match');
-    } else if (authorLower.includes(normalizedQuery)) {
+    } else if (sf.authorLower.includes(normalizedQuery)) {
       score += 20000;
       matchReasons.push('Author Phrase Match');
     }
 
     // 2. TOKEN & WORD PERMUTATION MATCHING (Tier 2: 1,000 - 25,000 points)
-    const titleTokens = tokenizeText(titleLower);
     let titleTokensMatched = 0;
 
     for (const qToken of queryTokens) {
-      if (titleLower.includes(qToken)) {
+      if (sf.titleLower.includes(qToken)) {
         titleTokensMatched++;
       } else {
-        for (const tToken of titleTokens) {
+        for (const tToken of sf.titleTokens) {
           if (fuzzyRatio(qToken, tToken) >= 0.80) {
             titleTokensMatched++;
             break;
@@ -316,9 +429,9 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
       score += titleTokensMatched * 2000;
     }
 
-    // Title Fuzzy Ratio (for spelling mistakes)
-    if (titleLower && normalizedQuery.length >= 4) {
-      const titleFuzzy = fuzzyRatio(normalizedQuery, titleLower);
+    // Title Fuzzy Ratio (for spelling mistakes) - Only run if title wasn't an exact/prefix/phrase match already
+    if (score < 40000 && sf.titleLower && normalizedQuery.length >= 4) {
+      const titleFuzzy = fuzzyRatio(normalizedQuery, sf.titleLower);
       if (titleFuzzy >= 0.75) {
         score += Math.floor(titleFuzzy * 15000);
         matchReasons.push(`Spelling similarity (${Math.round(titleFuzzy * 100)}%)`);
@@ -329,28 +442,28 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
     for (const qToken of queryTokens) {
       if (qToken.length < 2) continue; // Ignore single letter noise for generic fields
       
-      if (authorLower.includes(qToken)) {
+      if (sf.authorLower.includes(qToken)) {
         score += 1500;
       }
-      if (subjectLower.includes(qToken)) {
+      if (sf.subjectLower.includes(qToken)) {
         score += 1000;
         matchedConcepts.push(`Subject: ${book.subject}`);
       }
-      if (deptLower.includes(qToken)) {
+      if (sf.deptLower.includes(qToken)) {
         score += 800;
         matchedConcepts.push(`Dept: ${book.department}`);
       }
-      if (keywordsLower.includes(qToken)) {
+      if (sf.keywordsLower.includes(qToken)) {
         score += 600;
         matchedConcepts.push(`Keyword: ${qToken}`);
       }
-      if (descLower.includes(qToken)) {
+      if (sf.descLower.includes(qToken)) {
         score += 300;
       }
 
       // Raw CSV & custom attributes match - ONLY for meaningful tokens (length >= 3)
       if (qToken.length >= 3) {
-        if (rawDataLower.includes(qToken) || customAttrsLower.includes(qToken)) {
+        if (sf.rawDataLower.includes(qToken) || sf.customAttrsLower.includes(qToken)) {
           score += 150;
         }
       }
@@ -369,7 +482,7 @@ function performLocalSearch(query: string, books: Book[], searchMappings?: any, 
     }
   }
 
-  // CRITICAL FIX: Sort by rawScore DESCENDING!
+  // Sort by rawScore DESCENDING
   scoredItems.sort((a, b) => b.rawScore - a.rawScore);
 
   // NOISE FILTERING: If we have strong matches (score >= 5000), filter out weak random matches below threshold
@@ -876,6 +989,16 @@ app.post('/api/search/exact', (req, res) => {
   const { query, department, category, onlyAvailable, collegeId, limit, searchMappings: reqMappings } = req.body;
   const cleanQuery = (query || '').trim();
 
+  const cacheKey = `exact|${collegeId || ''}|${department || ''}|${category || ''}|${onlyAvailable ? 1 : 0}|${cleanQuery.toLowerCase()}`;
+  const cached = searchResultsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+    const maxLimit = limit === 'all' ? cached.books.length : (limit ? Math.max(Number(limit) || 1000, 1) : cached.books.length);
+    return res.json({
+      total: cached.books.length,
+      books: cached.books.slice(0, maxLimit)
+    });
+  }
+
   const targetCollege = collegesList.find(c => c.id === collegeId);
   const activeMappings = reqMappings || targetCollege?.searchMappings;
 
@@ -900,6 +1023,12 @@ app.post('/api/search/exact', (req, res) => {
     const searchResults = performLocalSearch(cleanQuery, filtered, activeMappings, 'exact');
     results = searchResults.map(r => r.book);
   }
+
+  searchResultsCache.set(cacheKey, {
+    total: results.length,
+    books: results,
+    timestamp: Date.now()
+  });
 
   const maxLimit = limit === 'all' ? results.length : (limit ? Math.max(Number(limit) || 1000, 1) : results.length);
 
@@ -928,6 +1057,18 @@ app.post('/api/search/ai', async (req, res) => {
 
   const userQuery = query.trim();
   const targetCollegeId = collegeId || 'col-gec-goa';
+
+  const aiCacheKey = `ai|${targetCollegeId}|${userQuery.toLowerCase()}`;
+  const aiCached = searchResultsCache.get(aiCacheKey);
+  if (aiCached && (Date.now() - aiCached.timestamp) < CACHE_TTL_MS && aiCached.rawResults) {
+    return res.json({
+      query: userQuery,
+      extractedConcepts: userQuery.split(/\s+/).filter(w => w.length > 2),
+      results: aiCached.rawResults,
+      searchTimeMs: Date.now() - startTime
+    });
+  }
+
   const targetCollege = collegesList.find(c => c.id === targetCollegeId);
   const activeMappings = reqMappings || targetCollege?.searchMappings;
 
@@ -935,6 +1076,23 @@ app.post('/api/search/ai', async (req, res) => {
 
   // Compute local intelligent search results (Instant, zero API quota, handles typos, reversed words & Control Panel column mappings)
   const localResults = performLocalSearch(userQuery, collegeBooksCatalog, activeMappings, 'ai');
+
+  // If top candidate matches directly with high confidence (e.g. Exact Title or ISBN match), return immediately without waiting for AI network roundtrip
+  if (localResults.length > 0 && localResults[0].confidenceScore >= 95) {
+    searchResultsCache.set(aiCacheKey, {
+      total: localResults.length,
+      books: localResults.map(r => r.book),
+      rawResults: localResults,
+      timestamp: Date.now()
+    });
+
+    return res.json({
+      query: userQuery,
+      extractedConcepts: userQuery.split(/\s+/).filter(w => w.length > 2),
+      results: localResults,
+      searchTimeMs: Date.now() - startTime
+    });
+  }
 
   // If Gemini API Key is available, optionally refine search results if API call succeeds
   if (process.env.GEMINI_API_KEY && localResults.length > 0) {
@@ -948,7 +1106,7 @@ app.post('/api/search/ai', async (req, res) => {
         }
       });
 
-      const topCandidates = localResults.slice(0, 50).map(r => r.book);
+      const topCandidates = localResults.slice(0, 30).map(r => r.book);
       const catalogSummary = topCandidates.map(b => ({
         id: b.id,
         title: b.title,
@@ -1035,6 +1193,13 @@ Return a JSON object with:
           const suggestedRelatedBooks = collegeBooksCatalog.filter(b => !matchedIdsSet.has(b.id)).slice(0, 3);
           searchLogs.push({ query: userQuery, type: 'ai', timestamp: new Date().toISOString(), resultsCount: results.length, collegeId: targetCollegeId });
 
+          searchResultsCache.set(aiCacheKey, {
+            total: results.length,
+            books: results.map(r => r.book),
+            rawResults: results,
+            timestamp: Date.now()
+          });
+
           return res.json({
             query: userQuery,
             extractedConcepts,
@@ -1049,21 +1214,19 @@ Return a JSON object with:
     }
   }
 
-  // Local Intelligent Fuzzy Search Results (Zero API quota usage, handles typos, reversed terms, & mapped columns)
-  const matchedIdsSet = new Set(localResults.map(r => r.book.id));
-  const suggestedRelatedBooks = collegeBooksCatalog.filter(b => !matchedIdsSet.has(b.id)).slice(0, 3);
+  searchResultsCache.set(aiCacheKey, {
+    total: localResults.length,
+    books: localResults.map(r => r.book),
+    rawResults: localResults,
+    timestamp: Date.now()
+  });
 
-  searchLogs.push({ query: userQuery, type: 'ai', timestamp: new Date().toISOString(), resultsCount: localResults.length, collegeId: targetCollegeId });
-
-  const responsePayload: AISearchResponse = {
+  res.json({
     query: userQuery,
     extractedConcepts: userQuery.split(/\s+/).filter(w => w.length > 2),
     results: localResults,
-    suggestedRelatedBooks: localResults.length === 0 ? suggestedRelatedBooks : undefined,
     searchTimeMs: Date.now() - startTime
-  };
-
-  res.json(responsePayload);
+  });
 });
 
 // POST /api/ai/keywords - Auto-generate metadata using Gemini for new books added by librarian

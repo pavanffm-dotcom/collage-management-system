@@ -342,7 +342,7 @@ export const BorrowBookModal: React.FC<BorrowBookModalProps> = ({ book, onClose,
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Step 1: Scan Student ID Card Barcode or Enter Roll No
+                    Scan student ID and barcode on order.
                   </label>
                   {!isCameraActive ? (
                     <button
@@ -351,7 +351,7 @@ export const BorrowBookModal: React.FC<BorrowBookModalProps> = ({ book, onClose,
                       className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      <span>Scan ID Barcode</span>
+                      <span>Scan College ID</span>
                     </button>
                   ) : (
                     <button
@@ -449,7 +449,7 @@ export const BorrowBookModal: React.FC<BorrowBookModalProps> = ({ book, onClose,
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Student Full Name *
+                      Enter your full name. *
                     </label>
                     <input
                       type="text"
@@ -465,7 +465,7 @@ export const BorrowBookModal: React.FC<BorrowBookModalProps> = ({ book, onClose,
                 {/* Borrow Type Selector */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                    Step 2: Where will you take this book? *
+                    Then, choose what to do: take home, reading room, or project lab. *
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     {[
@@ -524,7 +524,7 @@ export const BorrowBookModal: React.FC<BorrowBookModalProps> = ({ book, onClose,
                   className={`px-6 py-2.5 rounded-xl ${currentPreset.buttonBg} text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 disabled:opacity-50 transition-all`}
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Confirm Borrow & Issue Book</span>
+                  <span>Submit Borrow</span>
                 </button>
               </div>
 

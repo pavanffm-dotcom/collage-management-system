@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MapPin,
   Navigation,
@@ -8,19 +8,27 @@ import {
   Play,
   Pause,
   RotateCcw,
-  ChevronRight,
-  ChevronLeft,
   Footprints,
   Grid,
   Sparkles,
   BookOpen,
   Info,
   Clock,
-  ExternalLink,
-  Zap
+  Zap,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  DoorOpen,
+  Users,
+  Building2,
+  Shield,
+  Search,
+  Target
 } from 'lucide-react';
-import { ShelfLocation, Book } from '../types';
+import { ShelfLocation, Book, MapElement } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { DEMO_PRESET_MAP } from './MapDesigner';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface LibraryMapProps {
   location?: ShelfLocation;
@@ -28,71 +36,108 @@ interface LibraryMapProps {
   selectedBook?: Book;
 }
 
-interface AlmariNode {
-  id: string;
-  almariNum: number;
-  name: string;
-  x: number;
-  y: number;
-  wing: 'West Wing' | 'East Wing';
-  subjects: string;
-  department: string;
-}
-
 export const LibraryMap: React.FC<LibraryMapProps> = ({
   location: locationProp,
   bookTitle: bookTitleProp,
   selectedBook
 }) => {
-  const { currentPreset, colorTheme } = useTheme();
+  const { currentPreset } = useTheme();
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Extract location and title safely
   const location: ShelfLocation = selectedBook?.location || locationProp || {
-    almariNumber: 'A7',
+    almariNumber: 'A14',
     rowNumber: 'R2',
     shelfPosition: 'Middle',
-    shelfCode: 'A7-R2-M',
+    shelfCode: 'SHELF-014',
     sectionName: 'Central Library Stack'
   };
 
   const bookTitle: string = selectedBook?.title || bookTitleProp || 'Selected Book';
 
-  const targetAlmariNum = parseInt(location.almariNumber.replace(/\D/g, ''), 10) || 7;
+  // Load saved floor plan elements from localStorage
+  const [mapElements, setMapElements] = useState<MapElement[]>(() => {
+    const saved = localStorage.getItem('gec_library_map_elements');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Failed to load saved floor plan:', e);
+      }
+    }
+    // Fallback to sample map if librarian hasn't designed one yet
+    return DEMO_PRESET_MAP;
+  });
 
-  // 12 Almaris layout coordinates (viewBox 0 0 100 80)
-  const almaris: AlmariNode[] = [
-    { id: 'A1', almariNum: 1, name: 'Almari 1', x: 22, y: 22, wing: 'West Wing', subjects: 'Computer Science & Software', department: 'CS & IT' },
-    { id: 'A2', almariNum: 2, name: 'Almari 2', x: 22, y: 40, wing: 'West Wing', subjects: 'AI, ML & Data Science', department: 'AI & Data Science' },
-    { id: 'A3', almariNum: 3, name: 'Almari 3', x: 22, y: 58, wing: 'West Wing', subjects: 'Electronics & VLSI Systems', department: 'ECE' },
-    { id: 'A4', almariNum: 4, name: 'Almari 4', x: 38, y: 22, wing: 'West Wing', subjects: 'Electrical & Power Engineering', department: 'EEE' },
-    { id: 'A5', almariNum: 5, name: 'Almari 5', x: 38, y: 40, wing: 'West Wing', subjects: 'Mechanical & Robotics', department: 'Mechanical' },
-    { id: 'A6', almariNum: 6, name: 'Almari 6', x: 38, y: 58, wing: 'West Wing', subjects: 'Civil & Structural Design', department: 'Civil' },
-    { id: 'A7', almariNum: 7, name: 'Almari 7', x: 62, y: 22, wing: 'East Wing', subjects: 'Mathematics & Calculus', department: 'Applied Sciences' },
-    { id: 'A8', almariNum: 8, name: 'Almari 8', x: 62, y: 40, wing: 'East Wing', subjects: 'Physics, Quantum & Optics', department: 'Physics' },
-    { id: 'A9', almariNum: 9, name: 'Almari 9', x: 62, y: 58, wing: 'East Wing', subjects: 'Chemistry & Materials', department: 'Chemistry' },
-    { id: 'A10', almariNum: 10, name: 'Almari 10', x: 78, y: 22, wing: 'East Wing', subjects: 'Humanities & Social Science', department: 'Humanities' },
-    { id: 'A11', almariNum: 11, name: 'Almari 11', x: 78, y: 40, wing: 'East Wing', subjects: 'Management & Finance', department: 'Management' },
-    { id: 'A12', almariNum: 12, name: 'Almari 12', x: 78, y: 58, wing: 'East Wing', subjects: 'General Reference & Journals', department: 'General' }
-  ];
+  // Listen for live updates when librarian saves the floor plan in MapDesigner
+  useEffect(() => {
+    const handleStorageUpdate = () => {
+      const saved = localStorage.getItem('gec_library_map_elements');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setMapElements(parsed);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('gec_map_elements_updated', handleStorageUpdate);
+    return () => window.removeEventListener('gec_map_elements_updated', handleStorageUpdate);
+  }, []);
 
-  const targetAlmari = almaris.find(a => a.almariNum === targetAlmariNum) || almaris[6];
+  // Parse raw target identifier numbers & strings
+  const targetNumber = parseInt(location.almariNumber.replace(/\D/g, ''), 10) || 14;
+  const targetCodeClean = location.shelfCode ? location.shelfCode.toUpperCase() : `A${targetNumber}`;
+  const targetAlmariNumClean = location.almariNumber.toUpperCase();
 
-  // Active Map View Mode: '2d' floorplan vs 'grid' matrix
-  const [mapMode, setMapMode] = useState<'2d' | 'grid'>('2d');
+  // Find exact target element on the floorplan map
+  const targetElement = mapElements.find(e => {
+    if (e.shelfId && (e.shelfId.toUpperCase() === targetCodeClean || e.shelfId.toUpperCase() === targetAlmariNumClean)) return true;
+    if (e.code && (e.code.toUpperCase() === targetCodeClean || e.code.toUpperCase() === targetAlmariNumClean)) return true;
+    if (e.shelfNumber && Number(e.shelfNumber) === targetNumber) return true;
+    if (e.almariNum && Number(e.almariNum) === targetNumber) return true;
+    return false;
+  }) || mapElements.find(e => e.type === 'almari' || e.type === 'rack') || mapElements[0];
 
-  // Currently inspected Almari (defaults to targetAlmari)
-  const [inspectedAlmari, setInspectedAlmari] = useState<AlmariNode>(targetAlmari);
+  // Find entrance element on floorplan (or fallback to entrance/first node)
+  const entranceElement = mapElements.find(e => e.type === 'entrance' || e.code === 'ENTRANCE') || {
+    x: 400,
+    y: 500,
+    width: 120,
+    height: 60,
+    label: 'Main Entrance'
+  };
 
-  // Interactive Walkthrough Step Index (0 to 3)
+  // Student Canvas Pan and Zoom
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Navigation Walkthrough State
   const [activeStep, setActiveStep] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  // Keep target updated when prop changes
-  useEffect(() => {
-    setInspectedAlmari(targetAlmari);
-  }, [targetAlmariNum]);
+  // Smoothly center target shelf in viewport
+  const handleFocusTargetShelf = () => {
+    if (!targetElement) return;
+    const targetCenterX = targetElement.x + (targetElement.width || 100) / 2;
+    const targetCenterY = targetElement.y + (targetElement.height || 60) / 2;
+    
+    // Calculate pan offset to center target inside 600x450 viewport
+    setPan({
+      x: 300 - targetCenterX,
+      y: 200 - targetCenterY
+    });
+    setZoom(1.1);
+  };
 
-  // Walkthrough Auto-Play timer
+  // Center target on load or when target element changes
+  useEffect(() => {
+    handleFocusTargetShelf();
+  }, [targetElement?.id]);
+
+  // Step-by-step navigation auto-play loop
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPlaying) {
@@ -109,72 +154,96 @@ export const LibraryMap: React.FC<LibraryMapProps> = ({
     return () => clearInterval(timer);
   }, [isPlaying]);
 
-  // Navigation Waypoint Steps Data
+  // Route Path Coordinates (Entrance -> Center Corridor -> Target Shelf)
+  const entX = entranceElement.x + (entranceElement.width || 100) / 2;
+  const entY = entranceElement.y + (entranceElement.height || 60) / 2;
+  const tarX = targetElement ? targetElement.x + (targetElement.width || 100) / 2 : entX + 200;
+  const tarY = targetElement ? targetElement.y + (targetElement.height || 60) / 2 : entY - 200;
+
+  const midY = (entY + tarY) / 2;
+  const routeSVGPathD = `M ${entX} ${entY} L ${entX} ${midY} L ${tarX} ${midY} L ${tarX} ${tarY}`;
+
+  // Walkthrough waypoints
   const navigationSteps = [
     {
       step: 1,
-      title: 'Entrance & QR Scan Gate',
-      desc: 'Enter through the main Library Entrance Gate (Ground Floor). Verify access code at digital kiosk.',
-      coords: { x: 50, y: 72 },
+      title: 'Main Entrance & QR Gate',
+      desc: 'Enter through Main Entrance. Scan library access pass at digital scanner.',
+      coords: { x: entX, y: entY },
       icon: '🚪'
     },
     {
       step: 2,
-      title: 'Central Aisle Corridor',
-      desc: 'Proceed straight down the Central Aisle past OPAC search terminals towards Stack Room.',
-      coords: { x: 50, y: targetAlmari.y },
+      title: 'Central Corridor Aisle',
+      desc: 'Proceed along main walking corridor past OPAC terminals.',
+      coords: { x: entX, y: midY },
       icon: '🚶'
     },
     {
       step: 3,
-      title: `${targetAlmari.wing} Turn`,
-      desc: `Turn ${targetAlmari.x > 50 ? 'Right into East Wing' : 'Left into West Wing'} towards ${targetAlmari.department} section.`,
-      coords: { x: (50 + targetAlmari.x) / 2, y: targetAlmari.y },
+      title: `${tarX > entX ? 'East Wing' : 'West Wing'} Turn`,
+      desc: `Turn ${tarX > entX ? 'Right' : 'Left'} into ${targetElement?.section || 'Stack Area'}.`,
+      coords: { x: tarX, y: midY },
       icon: '↪️'
     },
     {
       step: 4,
-      title: `Almari ${targetAlmari.almariNum} - ${location.shelfCode}`,
-      desc: `Locate Almari ${targetAlmari.almariNum}. Search Row ${location.rowNumber.replace(/\D/g, '')} on ${location.shelfPosition} Shelf.`,
-      coords: { x: targetAlmari.x, y: targetAlmari.y },
+      title: `Destination Shelf: ${targetElement?.shelfId || targetElement?.code || 'Target'}`,
+      desc: `Locate ${targetElement?.label || 'Shelf'}. Find Row ${location.rowNumber.replace(/\D/g, '')} on ${location.shelfPosition} Shelf.`,
+      coords: { x: tarX, y: tarY },
       icon: '🎯'
     }
   ];
 
-  // SVG Path calculation for navigation route from Entrance (50, 72) -> (50, target.y) -> (target.x, target.y)
-  const routePathD = `M 50 72 L 50 ${targetAlmari.y} L ${targetAlmari.x} ${targetAlmari.y}`;
-
-  // Current active step coordinates for glowing traveler dot on map
   const activeStepCoords = navigationSteps[activeStep].coords;
 
-  // Approximate distance & walking time
-  const estimatedDistance = Math.round(Math.abs(50 - targetAlmari.x) + Math.abs(72 - targetAlmari.y) + 8);
-  const estimatedSeconds = Math.round(estimatedDistance * 0.8);
+  // Approximate metrics calculation
+  const estimatedDistance = Math.round(Math.hypot(tarX - entX, tarY - entY) / 10 + 10);
+  const estimatedSeconds = Math.round(estimatedDistance * 0.85);
+
+  // Mouse pan handlers for student
+  const handleMouseDownCanvas = (e: React.MouseEvent) => {
+    setIsPanning(true);
+    setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMoveCanvas = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({
+        x: e.clientX - startPan.x,
+        y: e.clientY - startPan.y
+      });
+    }
+  };
+
+  const handleMouseUpCanvas = () => {
+    setIsPanning(false);
+  };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-4">
 
-      {/* Top Banner: Shelf Code & Fast Navigation Summary */}
-      <div className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-4 sm:p-5 border ${currentPreset.cardBorder} shadow-lg relative overflow-hidden flex flex-wrap items-center justify-between gap-4`}>
+      {/* Top Banner: Location Header & Metrics */}
+      <div className={`${currentPreset.heroCardBg} ${currentPreset.cardRadius} p-4 sm:p-5 border ${currentPreset.cardBorder} shadow-lg flex flex-wrap items-center justify-between gap-4`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 ${currentPreset.badgeRadius} ${currentPreset.badgeBg}`}>
-              Exact Physical Location Code
+              Book Location Finder
             </span>
-            <span className="text-xs font-mono text-emerald-500 font-bold flex items-center gap-1">
-              <Zap className="w-3 h-3 fill-emerald-500" />
-              Live Route Active
+            <span className="text-xs font-mono text-emerald-500 font-extrabold flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 fill-emerald-500" />
+              Real-time Route Active
             </span>
           </div>
 
           <div className="flex items-baseline gap-3 pt-1">
             <span className="text-2xl sm:text-3xl font-black text-amber-500 font-mono tracking-wider">
-              {location.shelfCode}
+              {targetElement?.shelfId || location.shelfCode}
             </span>
-            <div className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">
-              <span>Almari {location.almariNumber.replace(/\D/g, '')}</span>
+            <div className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">
+              <span>Shelf {targetElement?.shelfNumber || location.almariNumber.replace(/\D/g, '')}</span>
               <span className="mx-1.5 opacity-40">•</span>
-              <span>Row {location.rowNumber.replace(/\D/g, '')}</span>
+              <span>Rack {targetElement?.rackNumber || 'A'}</span>
               <span className="mx-1.5 opacity-40">•</span>
               <span className={`${currentPreset.accentText} font-bold`}>{location.shelfPosition} Shelf</span>
             </div>
@@ -184,7 +253,7 @@ export const LibraryMap: React.FC<LibraryMapProps> = ({
           </p>
         </div>
 
-        {/* Quick Stats Badges */}
+        {/* Quick Metrics & Re-Center Button */}
         <div className="flex items-center gap-2 shrink-0">
           <div className={`p-2.5 ${currentPreset.innerCardBg} ${currentPreset.buttonRadius} border ${currentPreset.borderColor} text-center space-y-0.5`}>
             <div className="text-[10px] text-slate-400 font-medium uppercase flex items-center justify-center gap-1">
@@ -202,46 +271,48 @@ export const LibraryMap: React.FC<LibraryMapProps> = ({
               <span>Walk Time</span>
             </div>
             <div className="text-xs sm:text-sm font-bold font-mono text-slate-800 dark:text-white">
-              {estimatedSeconds} sec
+              ~{estimatedSeconds}s
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleFocusTargetShelf}
+            className="px-3.5 py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-cyan-600/20 transition-all transform hover:scale-105"
+            title="Re-center map on target shelf"
+          >
+            <Target className="w-4 h-4 animate-spin-slow" />
+            <span>Center Target</span>
+          </button>
         </div>
       </div>
 
-      {/* Mode Switcher & Navigation Step Player Header */}
+      {/* Interactive Step Walkthrough Bar */}
       <div className={`p-3 ${currentPreset.cardBg} ${currentPreset.cardRadius} border ${currentPreset.cardBorder} flex flex-wrap items-center justify-between gap-3`}>
         
-        {/* Step Walkthrough Controller */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
             className={`px-3 py-1.5 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all`}
-            title={isPlaying ? 'Pause Navigation Animation' : 'Play Step-by-Step Navigation'}
           >
             {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-            <span>{isPlaying ? 'Pause' : 'Play Walkthrough'}</span>
+            <span>{isPlaying ? 'Pause Walkthrough' : 'Play Animated Route'}</span>
           </button>
 
           <button
-            onClick={() => {
-              setIsPlaying(false);
-              setActiveStep(0);
-            }}
+            onClick={() => { setIsPlaying(false); setActiveStep(0); }}
             className={`p-1.5 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} text-slate-600 dark:text-slate-300 hover:text-slate-900`}
-            title="Reset to Entrance"
+            title="Reset route to entrance"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          {/* Step Pill Indicators */}
+          {/* Step Indicators */}
           <div className="flex items-center gap-1 ml-1">
             {navigationSteps.map((s, idx) => (
               <button
                 key={s.step}
-                onClick={() => {
-                  setIsPlaying(false);
-                  setActiveStep(idx);
-                }}
+                onClick={() => { setIsPlaying(false); setActiveStep(idx); }}
                 className={`w-6 h-6 ${currentPreset.buttonRadius} text-[11px] font-bold flex items-center justify-center transition-all ${
                   activeStep === idx
                     ? `${currentPreset.buttonBg} text-white shadow-sm scale-110`
@@ -249,7 +320,6 @@ export const LibraryMap: React.FC<LibraryMapProps> = ({
                     ? 'bg-emerald-500 text-white'
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
                 }`}
-                title={s.title}
               >
                 {s.step}
               </button>
@@ -257,368 +327,202 @@ export const LibraryMap: React.FC<LibraryMapProps> = ({
           </div>
         </div>
 
-        {/* View Mode Toggle: 2D Floorplan vs Grid Matrix */}
-        <div className={`inline-flex p-1 ${currentPreset.innerCardBg} ${currentPreset.buttonRadius} border ${currentPreset.borderColor}`}>
-          <button
-            onClick={() => setMapMode('2d')}
-            className={`px-3 py-1 ${currentPreset.buttonRadius} text-xs font-bold flex items-center gap-1.5 transition-all ${
-              mapMode === '2d'
-                ? `${currentPreset.buttonBg} shadow-xs`
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Compass className="w-3.5 h-3.5" />
-            <span>2D Map View</span>
-          </button>
-
-          <button
-            onClick={() => setMapMode('grid')}
-            className={`px-3 py-1 ${currentPreset.buttonRadius} text-xs font-bold flex items-center gap-1.5 transition-all ${
-              mapMode === 'grid'
-                ? `${currentPreset.buttonBg} shadow-xs`
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Grid className="w-3.5 h-3.5" />
-            <span>Grid Matrix</span>
-          </button>
+        {/* Current Active Step Text */}
+        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+          <span>{navigationSteps[activeStep].icon}</span>
+          <span>Step {activeStep + 1}: {navigationSteps[activeStep].title}</span>
         </div>
       </div>
 
-      {/* MAP VIEW BODY */}
-      {mapMode === '2d' ? (
-        /* INTERACTIVE 2D SVG FLOORPLAN MAP */
-        <div className="bg-slate-950 text-slate-200 rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-2xl relative overflow-hidden space-y-4">
-          
-          {/* Header Bar inside map */}
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span className="flex items-center gap-1.5 font-bold text-slate-200">
-              <Compass className="w-4 h-4 text-indigo-400" />
-              <span>Library Ground Floor Architectural Layout</span>
-            </span>
-            <div className="flex items-center gap-3 text-[11px]">
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-slate-800 border border-slate-600 inline-block" />
-                <span>Almari</span>
-              </span>
-              <span className="flex items-center gap-1 text-amber-400 font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block animate-ping" />
-                <span>Target ({location.shelfCode})</span>
-              </span>
-            </div>
-          </div>
-
-          {/* SVG Canvas Container */}
-          <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] bg-slate-950 rounded-xl border border-slate-800/90 overflow-hidden shadow-inner">
-            <svg className="w-full h-full select-none" viewBox="0 0 100 80">
-              <defs>
-                {/* Architectural Grid pattern */}
-                <pattern id="archGrid" width="5" height="5" patternUnits="userSpaceOnUse">
-                  <path d="M 5 0 L 0 0 0 5" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.3" />
-                </pattern>
-                
-                {/* Glowing neon path filter */}
-                <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="0.8" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              <rect width="100" height="80" fill="url(#archGrid)" />
-
-              {/* Wing Labels */}
-              <text x="30" y="10" textAnchor="middle" fill="#64748b" fontSize="2.2" fontWeight="bold" letterSpacing="0.2">
-                WEST WING (TECH & ENGG)
-              </text>
-              <text x="70" y="10" textAnchor="middle" fill="#64748b" fontSize="2.2" fontWeight="bold" letterSpacing="0.2">
-                EAST WING (SCIENCES & ARTS)
-              </text>
-
-              {/* Reading Zone (West side) */}
-              <rect x="4" y="16" width="10" height="48" rx="1.5" fill="#0f172a" stroke="#1e293b" strokeWidth="0.5" />
-              <text x="9" y="40" textAnchor="middle" fill="#475569" fontSize="1.8" fontWeight="bold" transform="rotate(-90 9 40)">
-                STUDY & READING TABLES ZONE
-              </text>
-
-              {/* OPAC Kiosk Desk (Center) */}
-              <rect x="44" y="62" width="12" height="5" rx="1" fill="#1e1b4b" stroke="#4338ca" strokeWidth="0.5" />
-              <text x="50" y="65.2" textAnchor="middle" fill="#a5b4fc" fontSize="1.8" fontWeight="bold">
-                OPAC SEARCH KIOSK
-              </text>
-
-              {/* Entrance Gate */}
-              <rect x="40" y="73" width="20" height="6" rx="1.5" fill="#1e1b4b" stroke="#6366f1" strokeWidth="0.8" />
-              <text x="50" y="77" textAnchor="middle" fill="#e0e7ff" fontSize="2.2" fontWeight="extrabold">
-                ENTRANCE / QR GATE
-              </text>
-
-              {/* Help Desk (East side) */}
-              <rect x="76" y="71" width="20" height="6" rx="1.5" fill="#0f172a" stroke="#1e293b" strokeWidth="0.5" />
-              <text x="86" y="75" textAnchor="middle" fill="#64748b" fontSize="1.8" fontWeight="bold">
-                HELP DESK & COUNTER
-              </text>
-
-              {/* Central Aisle Guide Line */}
-              <line x1="50" y1="73" x2="50" y2="15" stroke="#334155" strokeWidth="0.5" strokeDasharray="1 1" />
-
-              {/* Full Route Path line to Target Almari */}
-              <path
-                d={routePathD}
-                fill="none"
-                stroke="#f59e0b"
-                strokeWidth="1.2"
-                strokeDasharray="2 1.5"
-                filter="url(#neonGlow)"
-              />
-
-              {/* Step Segment Highlight Line */}
-              {activeStep > 0 && (
-                <line
-                  x1={navigationSteps[activeStep - 1].coords.x}
-                  y1={navigationSteps[activeStep - 1].coords.y}
-                  x2={activeStepCoords.x}
-                  y2={activeStepCoords.y}
-                  stroke="#38bdf8"
-                  strokeWidth="1.8"
-                  filter="url(#neonGlow)"
-                />
-              )}
-
-              {/* Animated Glowing Traveler Marker Dot */}
-              <g transform={`translate(${activeStepCoords.x}, ${activeStepCoords.y})`}>
-                <circle r="3.5" fill="#38bdf8" opacity="0.3" className="animate-ping" />
-                <circle r="2.2" fill="#0284c7" stroke="#ffffff" strokeWidth="0.6" />
-                <circle r="1" fill="#ffffff" />
-              </g>
-
-              {/* Almari Nodes (1 to 12) */}
-              {almaris.map(a => {
-                const isTarget = a.almariNum === targetAlmari.almariNum;
-                const isInspected = a.almariNum === inspectedAlmari.almariNum;
-
-                return (
-                  <g
-                    key={a.id}
-                    onClick={() => setInspectedAlmari(a)}
-                    className="cursor-pointer transition-transform hover:scale-105"
-                  >
-                    {/* Almari Box */}
-                    <rect
-                      x={a.x - 6}
-                      y={a.y - 4.5}
-                      width="12"
-                      height="9"
-                      rx="1.5"
-                      fill={isTarget ? '#1e1b4b' : isInspected ? '#1e293b' : '#0f172a'}
-                      stroke={isTarget ? '#f59e0b' : isInspected ? '#38bdf8' : '#334155'}
-                      strokeWidth={isTarget ? '1.4' : isInspected ? '1.0' : '0.6'}
-                      filter={isTarget ? 'url(#neonGlow)' : undefined}
-                    />
-
-                    {/* Shelf Compartment divider line */}
-                    <line x1={a.x - 5} y1={a.y} x2={a.x + 5} y2={a.y} stroke="rgba(255,255,255,0.15)" strokeWidth="0.4" />
-
-                    {/* Label Text */}
-                    <text
-                      x={a.x}
-                      y={a.y - 0.8}
-                      textAnchor="middle"
-                      fill={isTarget ? '#fbbf24' : isInspected ? '#38bdf8' : '#cbd5e1'}
-                      fontSize="2.4"
-                      fontWeight={isTarget ? '900' : 'bold'}
-                    >
-                      A{a.almariNum}
-                    </text>
-
-                    {/* Sub Dept Code */}
-                    <text
-                      x={a.x}
-                      y={a.y + 2.8}
-                      textAnchor="middle"
-                      fill={isTarget ? '#fef08a' : '#64748b'}
-                      fontSize="1.5"
-                      fontWeight="bold"
-                    >
-                      {a.department.split(' ')[0]}
-                    </text>
-
-                    {/* Glowing Target Pulsing Indicator */}
-                    {isTarget && (
-                      <circle cx={a.x + 4.5} cy={a.y - 3} r="1.5" fill="#f59e0b" className="animate-ping" />
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-
-          {/* Active Navigation Step Card */}
-          <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{navigationSteps[activeStep].icon}</span>
-              <div>
-                <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                  Step {activeStep + 1} of 4 • Navigation Guide
-                </div>
-                <div className="font-bold text-white text-xs sm:text-sm">
-                  {navigationSteps[activeStep].title}
-                </div>
-                <div className="text-slate-400 text-[11px]">
-                  {navigationSteps[activeStep].desc}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                disabled={activeStep === 0}
-                onClick={() => { setIsPlaying(false); setActiveStep(p => Math.max(0, p - 1)); }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                disabled={activeStep === 3}
-                onClick={() => { setIsPlaying(false); setActiveStep(p => Math.min(3, p + 1)); }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-        </div>
-      ) : (
-        /* INTERACTIVE GRID MATRIX VIEW */
-        <div className="space-y-4">
-          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-            <span>Select any Almari card to view its department & rack details:</span>
-            <span className="font-bold text-amber-500">Target Almari: A{targetAlmariNum}</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {almaris.map(a => {
-              const isTarget = a.almariNum === targetAlmari.almariNum;
-              const isInspected = a.almariNum === inspectedAlmari.almariNum;
-
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => setInspectedAlmari(a)}
-                  className={`p-3.5 ${currentPreset.cardRadius} border cursor-pointer transition-all duration-300 space-y-2 relative overflow-hidden ${
-                    isTarget
-                      ? `${currentPreset.cardBg} border-amber-500 dark:border-amber-500 ring-2 ring-amber-500/40 shadow-lg`
-                      : isInspected
-                      ? `${currentPreset.innerCardBg} border-indigo-500 dark:border-indigo-500`
-                      : `bg-white/70 dark:bg-slate-900/70 ${currentPreset.borderColor} hover:border-slate-400`
-                  }`}
-                >
-                  {isTarget && (
-                    <div className="absolute top-2 right-2 bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      <span>TARGET</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 ${currentPreset.buttonRadius} ${isTarget ? 'bg-amber-500 text-slate-950' : currentPreset.buttonBg} font-mono font-black text-xs flex items-center justify-center shrink-0`}>
-                      A{a.almariNum}
-                    </div>
-                    <div className="truncate">
-                      <h5 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {a.department}
-                      </h5>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        {a.wing}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-slate-600 dark:text-slate-400 line-clamp-2 leading-tight">
-                    {a.subjects}
-                  </p>
-
-                  <div className="pt-1 flex items-center justify-between text-[10px] border-t border-slate-200/50 dark:border-slate-800/50">
-                    <span className="text-slate-400 font-mono">Row 1-4</span>
-                    <span className={`font-bold ${isTarget ? 'text-amber-500' : currentPreset.accentText}`}>
-                      {isTarget ? `Row ${location.rowNumber}` : '3 Shelves'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* INSPECTED ALMARI PHYSICAL RACK BREAKDOWN VISUALIZER */}
-      <div className={`${currentPreset.cardBg} ${currentPreset.cardRadius} p-5 border ${currentPreset.cardBorder} shadow-lg space-y-4 transition-all duration-300`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className={`w-4 h-4 ${currentPreset.accentText}`} />
-            <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-              Almari {inspectedAlmari.almariNum} ({inspectedAlmari.department}) Rack Breakdown
-            </h4>
-          </div>
-
-          <span className={`text-xs font-bold px-2.5 py-1 ${currentPreset.badgeRadius} ${currentPreset.badgeBg}`}>
-            {inspectedAlmari.wing}
+      {/* STUDENT MAP CANVAS VIEWPORT */}
+      <div
+        ref={canvasRef}
+        onMouseDown={handleMouseDownCanvas}
+        onMouseMove={handleMouseMoveCanvas}
+        onMouseUp={handleMouseUpCanvas}
+        className="bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden h-[500px] select-none cursor-grab active:cursor-grabbing"
+      >
+        {/* Map View Zoom & Reset Floating Overlay */}
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setZoom(prev => Math.max(0.4, prev - 0.1))}
+            className="p-1.5 text-slate-300 hover:bg-slate-800 rounded-lg"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-[10px] font-mono text-slate-300 px-1 font-bold">
+            {Math.round(zoom * 100)}%
           </span>
+          <button
+            onClick={() => setZoom(prev => Math.min(2.5, prev + 0.1))}
+            className="p-1.5 text-slate-300 hover:bg-slate-800 rounded-lg"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleFocusTargetShelf}
+            className="p-1.5 text-cyan-400 hover:bg-slate-800 rounded-lg"
+            title="Re-center on Target Shelf"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* 3 Shelf Racks (Top, Middle, Bottom) */}
-        <div className="space-y-2.5">
-          {['Top', 'Middle', 'Bottom'].map((pos) => {
-            const isTargetPos = inspectedAlmari.almariNum === targetAlmari.almariNum && location.shelfPosition === pos;
+        {/* Transform Canvas with Pan & Zoom */}
+        <div
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            width: '2000px',
+            height: '2000px',
+            position: 'absolute',
+            top: 0,
+            left: 0
+          }}
+          className="relative"
+        >
+          {/* Background Grid Lines */}
+          <svg className="absolute inset-0 w-full h-full opacity-15 pointer-events-none">
+            <defs>
+              <pattern id="studentGridPattern" width="30" height="30" patternUnits="userSpaceOnUse">
+                <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#38bdf8" strokeWidth="0.5" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#studentGridPattern)" />
+          </svg>
+
+          {/* SVG WALKING ROUTE PATH */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" style={{ overflow: 'visible' }}>
+            <defs>
+              <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="50%" stopColor="#06b6d4" />
+                <stop offset="100%" stopColor="#f59e0b" />
+              </linearGradient>
+            </defs>
+
+            {/* Glowing Path Back Line */}
+            <path
+              d={routeSVGPathD}
+              fill="none"
+              stroke="url(#routeGradient)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="opacity-40 blur-sm"
+            />
+
+            {/* Main Dash Animated Navigation Path */}
+            <path
+              d={routeSVGPathD}
+              fill="none"
+              stroke="url(#routeGradient)"
+              strokeWidth="4"
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="animate-pulse"
+            />
+
+            {/* Entrance Pin */}
+            <g transform={`translate(${entX}, ${entY})`}>
+              <circle r="12" fill="#059669" className="animate-ping opacity-75" />
+              <circle r="8" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+            </g>
+
+            {/* Traveler Node for Active Step Walkthrough */}
+            <g transform={`translate(${activeStepCoords.x}, ${activeStepCoords.y})`} className="transition-all duration-700 ease-out">
+              <circle r="18" fill="#38bdf8" className="animate-ping opacity-60" />
+              <circle r="10" fill="#0284c7" stroke="#ffffff" strokeWidth="2" />
+            </g>
+          </svg>
+
+          {/* RENDER ALL SAVED MAP FLOORPLAN ELEMENTS */}
+          {mapElements.map(elem => {
+            const isTarget = targetElement?.id === elem.id;
 
             return (
               <div
-                key={pos}
-                className={`p-3.5 ${currentPreset.buttonRadius} border transition-all flex items-center justify-between gap-3 ${
-                  isTargetPos
-                    ? 'bg-amber-500/15 border-amber-500 text-slate-900 dark:text-amber-200 ring-2 ring-amber-500/40 shadow-md'
-                    : `${currentPreset.innerCardBg} ${currentPreset.borderColor} text-slate-600 dark:text-slate-400 opacity-75`
+                key={elem.id}
+                style={{
+                  position: 'absolute',
+                  left: `${elem.x}px`,
+                  top: `${elem.y}px`,
+                  width: `${elem.width}px`,
+                  height: `${elem.height}px`,
+                  transform: `rotate(${elem.rotation || 0}deg)`,
+                  backgroundColor: elem.fillColor || '#1e293b',
+                  borderColor: isTarget ? '#f59e0b' : elem.borderColor || '#475569',
+                  borderWidth: isTarget ? '3px' : `${elem.borderWidth || 2}px`,
+                  borderStyle: 'solid',
+                  borderRadius: `${elem.cornerRadius || 8}px`,
+                  opacity: isTarget ? 1 : (elem.opacity ?? 0.85),
+                  zIndex: isTarget ? 25 : (elem.zIndex || 1)
+                }}
+                className={`p-2 flex flex-col justify-between transition-all select-none ${
+                  isTarget ? 'ring-4 ring-amber-400 ring-offset-4 ring-offset-slate-950 shadow-2xl scale-105' : 'filter blur-[0.2px]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 ${currentPreset.buttonRadius} ${isTargetPos ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'} flex items-center justify-center text-xs font-bold shrink-0`}>
-                    {pos[0]}
-                  </div>
-                  <div>
-                    <div className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span>{pos} Shelf</span>
-                      <span className="text-[10px] font-mono font-normal text-slate-500">
-                        Row {location.rowNumber.replace(/\D/g, '')}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {pos === 'Top' && 'Eye-level top rack (Subject references & monographs)'}
-                      {pos === 'Middle' && 'Primary reach rack (Standard textbooks & handbooks)'}
-                      {pos === 'Bottom' && 'Lower rack (Large volumes & bound periodicals)'}
-                    </div>
-                  </div>
+                {/* Element Label */}
+                <div className="flex items-center justify-between gap-1">
+                  <span
+                    style={{ color: elem.textColor || '#ffffff', fontSize: `${elem.fontSize || 12}px` }}
+                    className={`font-bold truncate ${isTarget ? 'text-amber-300' : ''}`}
+                  >
+                    {elem.label}
+                  </span>
                 </div>
 
-                {isTargetPos && (
-                  <div className="px-3 py-1.5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-md shrink-0 animate-pulse">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Target Book Here ({location.shelfCode})</span>
+                {/* Shelf ID Badge */}
+                {(elem.type === 'almari' || elem.type === 'rack' || elem.shelfId) && (
+                  <div className={`flex items-center justify-between text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    isTarget ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-900/80 text-amber-300 border border-amber-500/20'
+                  }`}>
+                    <span>{elem.shelfId || elem.code}</span>
+                    {elem.shelfNumber && <span>#{elem.shelfNumber}</span>}
+                  </div>
+                )}
+
+                {/* TARGET HIGHLIGHT SPOTLIGHT ANIMATION OVERLAY */}
+                {isTarget && (
+                  <div className="absolute -inset-4 rounded-2xl border-2 border-amber-400 border-dashed animate-spin-slow pointer-events-none flex items-center justify-center">
+                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-ping" />
                   </div>
                 )}
               </div>
             );
           })}
+
         </div>
 
-        {/* Textual Walking Directions Footnote */}
-        <div className={`p-3 ${currentPreset.innerCardBg} ${currentPreset.inputRadius} border ${currentPreset.borderColor} text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2.5`}>
-          <Navigation className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
-          <div className="leading-relaxed">
-            <strong className="text-slate-900 dark:text-white">Route Instructions: </strong>
-            From Entrance Gate → Walk {estimatedDistance}m down Central Aisle → Turn {targetAlmari.x > 50 ? 'Right into East Wing' : 'Left into West Wing'} → Walk to <strong className="text-amber-500">Almari {targetAlmari.almariNum} ({targetAlmari.department})</strong> → Find Row {location.rowNumber.replace(/\D/g, '')} on <strong className="text-amber-500">{location.shelfPosition} Shelf</strong>.
+        {/* Floating Target Spotlight Info Card at Bottom */}
+        <div className="absolute bottom-3 left-3 right-3 z-20 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-slate-800 shadow-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-black shrink-0">
+              <Target className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-white">{targetElement?.label || 'Target Bookshelf'}</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
+                  {targetElement?.shelfId || location.shelfCode}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {navigationSteps[activeStep].desc}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveStep(prev => (prev < 3 ? prev + 1 : 0))}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all"
+            >
+              {activeStep === 3 ? 'Restart Step 1' : 'Next Step →'}
+            </button>
           </div>
         </div>
 

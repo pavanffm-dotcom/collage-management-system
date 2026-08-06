@@ -50,38 +50,42 @@ export const StudentShelfCard: React.FC<StudentShelfCardProps> = ({ book, aiResu
         </p>
       )}
 
-      {/* Action Buttons: Scan & Borrow (Take Home) + Shelf Map */}
+      {/* Action Buttons: Exactly Two Buttons (Borrow + Locate) */}
       <div className="space-y-2 pt-1">
         {isAvailable ? (
-          <button
-            onClick={() => onBorrow(book)}
-            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.99]"
-          >
-            <QrCode className="w-5 h-5 animate-pulse" />
-            <span>Scan Student ID & Take Home / Borrow</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onBorrow(book)}
+              className="py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.99]"
+            >
+              <QrCode className="w-4 h-4 animate-pulse" />
+              <span>Scan College ID</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectBook(book, true)}
+              className={`py-3 px-3 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm hover:opacity-90`}
+            >
+              <Navigation className="w-4 h-4" />
+              <span>Locate</span>
+            </button>
+          </div>
         ) : (
-          <div className="w-full py-2.5 px-4 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs text-center rounded-xl">
-            Currently Issued Out (Check Back Soon)
+          <div className="grid grid-cols-2 gap-2">
+            <div className="py-2.5 px-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs text-center rounded-xl flex items-center justify-center">
+              Issued Out
+            </div>
+            <button
+              type="button"
+              onClick={() => onSelectBook(book, true)}
+              className={`py-2.5 px-3 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm hover:opacity-90`}
+            >
+              <Navigation className="w-4 h-4" />
+              <span>Locate</span>
+            </button>
           </div>
         )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => onSelectBook(book, true)}
-            className={`flex-1 py-2 px-3 ${currentPreset.buttonBg} ${currentPreset.buttonRadius} font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm`}
-          >
-            <Navigation className="w-3.5 h-3.5" />
-            <span>View Full Library Map</span>
-          </button>
-          <button
-            onClick={() => onSelectBook(book, false)}
-            className={`py-2 px-3 ${currentPreset.secondaryButtonBg} ${currentPreset.buttonRadius} font-medium text-xs flex items-center justify-center gap-1 transition-colors`}
-          >
-            <span>Details</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
 
     </div>

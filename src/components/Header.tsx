@@ -23,8 +23,10 @@ import {
   RefreshCw,
   Download,
   SlidersHorizontal,
-  Globe
+  Globe,
+  Compass
 } from 'lucide-react';
+
 import { useTheme } from '../context/ThemeContext';
 import { College } from '../types';
 import { FullscreenButton } from './FullscreenButton';
@@ -39,8 +41,9 @@ interface HeaderProps {
   onCloseQRModal?: () => void;
   activeView: 'public' | 'admin';
   setActiveView: (view: 'public' | 'admin') => void;
-  adminTab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory';
-  setAdminTab: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => void;
+  adminTab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer';
+  setAdminTab: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer') => void;
+
   
   // Department-switching parameters
   selectedDept?: string;
@@ -82,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
   const currentDeptObj = departments.find(d => d.id === selectedDept) || departments[0];
   const CurrentDeptIcon = currentDeptObj.icon;
 
-  const handleTabClick = (targetView: 'public' | 'admin', tab?: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => {
+  const handleTabClick = (targetView: 'public' | 'admin', tab?: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer') => {
     setActiveView(targetView);
     if (tab) {
       setAdminTab(tab);
@@ -255,6 +258,20 @@ export const Header: React.FC<HeaderProps> = ({
                   <RefreshCw className={`w-4 h-4 ${activeView === 'admin' && adminTab === 'circulation' ? 'text-white' : 'text-indigo-500'}`} />
                   <span>Circulation Desk</span>
                 </button>
+
+                {/* 2D Map Designer Tab */}
+                <button
+                  onClick={() => handleTabClick('admin', 'map_designer')}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 ${currentPreset.buttonRadius} text-xs font-bold transition-all ${
+                    activeView === 'admin' && adminTab === 'map_designer'
+                      ? `${currentPreset.buttonBg} text-white shadow-md font-extrabold scale-[1.01]`
+                      : `text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white ${currentPreset.secondaryButtonBg} opacity-80 hover:opacity-100`
+                  }`}
+                >
+                  <Compass className={`w-4 h-4 ${activeView === 'admin' && adminTab === 'map_designer' ? 'text-white' : 'text-cyan-400'}`} />
+                  <span>2D Map Designer</span>
+                </button>
+
 
                 {/* Cataloging & Add Books Tab (Librarian/Admin only) */}
                 {authUser.role !== 'Staff' && (

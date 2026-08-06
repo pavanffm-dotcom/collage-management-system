@@ -5,7 +5,9 @@ import { AnalyticsView } from './AnalyticsView';
 import { SettingsView } from './SettingsView';
 import { BulkImportModal } from './BulkImportModal';
 import { LibraryStaffDirectory } from './LibraryStaffDirectory';
+import { MapDesigner } from './MapDesigner';
 import { CuteQRCodeSVG } from './CuteQRCodeSVG';
+
 import { exportBooksToCSV, downloadSampleTemplateCSV, parseCSVToRawDataset } from '../utils/csvUtils';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,8 +24,8 @@ interface AdminPanelProps {
   departments: string[];
   currentCollege: College | null;
   onUpdateCollege: (updatedCollege: Partial<College>) => Promise<void>;
-  activeTab?: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory';
-  setActiveTab?: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory') => void;
+  activeTab?: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer';
+  setActiveTab?: (tab: 'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer') => void;
   onLogout?: () => void;
   authUser?: any;
   onOpenQRModal?: () => void;
@@ -56,7 +58,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenInstallModal
 }) => {
   const { currentPreset } = useTheme();
-  const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory'>('add');
+  const [localActiveTab, setLocalActiveTab] = useState<'add' | 'analytics' | 'qr' | 'settings' | 'circulation' | 'directory' | 'map_designer'>('add');
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = propSetActiveTab || setLocalActiveTab;
   const [searchFilter, setSearchFilter] = useState('');
@@ -2039,6 +2041,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <LibraryStaffDirectory />
         </motion.div>
       )}
+
+      {/* Tab 7: 2D Floorplan & Map Layout Designer */}
+      {activeTab === 'map_designer' && (
+        <motion.div
+          key="map_designer"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.15 }}
+        >
+          <MapDesigner />
+        </motion.div>
+      )}
+
     </AnimatePresence>
 
       {/* Bulk Import CSV Modal */}
