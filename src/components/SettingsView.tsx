@@ -292,13 +292,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Library Modules Quick Access Panel (Crucial for Mobile & Tablet access) */}
-      <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
+      <div className={`${currentPreset.cardBg} ${currentPreset.cardRadius} p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4`}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-500" />
+            <Layers className={`w-4 h-4 ${currentPreset.accentText}`} />
             <span>Library Operations & Module Shortcuts</span>
           </h3>
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 ${currentPreset.badgeRadius} ${currentPreset.badgeBg}`}>
             Quick Navigation
           </span>
         </div>
@@ -308,13 +308,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab && onSelectTab('circulation')}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <RefreshCw className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Circulation</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Circulation</span>
               <span className="text-[10px] text-slate-400 block font-medium">Issue & Return</span>
             </div>
           </button>
@@ -323,13 +323,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab && onSelectTab('analytics')}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-amber-950/50 border border-slate-200 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <BarChart2 className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Analytics</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Analytics</span>
               <span className="text-[10px] text-slate-400 block font-medium">Reports & Stats</span>
             </div>
           </button>
@@ -338,13 +338,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab && onSelectTab('directory')}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Directory</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Directory</span>
               <span className="text-[10px] text-slate-400 block font-medium">Staff & Faculty</span>
             </div>
           </button>
@@ -356,13 +356,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               if (onSelectTab) onSelectTab('qr');
               if (onOpenQRModal) onOpenQRModal();
             }}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-purple-50 dark:hover:bg-purple-950/50 border border-slate-200 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <QrCode className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Entrance QR</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Entrance QR</span>
               <span className="text-[10px] text-slate-400 block font-medium">Gate Scanner</span>
             </div>
           </button>
@@ -374,13 +374,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               if (onOpenBarcodeModal) onOpenBarcodeModal();
               else if (onOpenQRModal) onOpenQRModal();
             }}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <Barcode className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Barcode & Shelf</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Barcode & Shelf</span>
               <span className="text-[10px] text-slate-400 block font-medium">Camera Mapper</span>
             </div>
           </button>
@@ -389,13 +389,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => setIsControlPanelModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform`}>
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 dark:text-white block">Control Panel</span>
+              <span className={`text-xs font-bold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Control Panel</span>
               <span className="text-[10px] text-slate-400 block font-medium">Manage Columns</span>
             </div>
           </button>
@@ -404,14 +404,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => setIsPublicLinkModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95"
+            className={`p-3.5 ${currentPreset.cardRadius} ${currentPreset.innerCardBg} border ${currentPreset.cardBorder} hover:border-current transition-all flex flex-col items-center justify-center gap-2 text-center group active:scale-95`}
           >
-            <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+            <div className={`w-9 h-9 ${currentPreset.buttonRadius} ${currentPreset.buttonBg} flex items-center justify-center group-hover:scale-110 transition-transform shadow-md`}>
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block">Public Link</span>
-              <span className="text-[10px] text-emerald-500 block font-medium">Student Kiosk</span>
+              <span className={`text-xs font-extrabold text-slate-900 dark:text-white group-hover:${currentPreset.accentText} block transition-colors`}>Public Link</span>
+              <span className="text-[10px] text-slate-400 block font-medium">Student Kiosk</span>
             </div>
           </button>
         </div>

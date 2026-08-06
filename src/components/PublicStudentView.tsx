@@ -387,7 +387,7 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
             </AnimatePresence>
 
             {/* 🚀 QUICK STUDENT ACCESS & DYNAMIC REDIRECT LINKS SECTION */}
-            <div className="pt-4 border-t border-slate-200/40 dark:border-slate-800/60 space-y-3">
+            <div className={`pt-4 border-t ${currentPreset.borderColor} space-y-3`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Previous Year Question Papers (PYQ) Button */}
                 <button
@@ -396,19 +396,19 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                     const targetUrl = quickLinks.pyqUrl || 'https://drive.google.com';
                     window.open(targetUrl, '_blank', 'noopener,noreferrer');
                   }}
-                  className={`p-3.5 rounded-2xl border ${currentPreset.cardBorder} hover:border-indigo-500 dark:hover:border-indigo-400 bg-white/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
+                  className={`p-3.5 ${currentPreset.cardRadius} border ${currentPreset.cardBorder} ${currentPreset.cardBg} transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <div className={`w-10 h-10 ${currentPreset.buttonRadius} ${currentPreset.innerCardBg} ${currentPreset.accentText} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform`}>
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-sm font-black text-slate-900 dark:text-white block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <span className={`text-sm font-black text-slate-900 dark:text-white block group-hover:${currentPreset.accentText} transition-colors`}>
                         PYQ
                       </span>
                     </div>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ExternalLink className={`w-4 h-4 text-slate-400 group-hover:${currentPreset.accentText} group-hover:translate-x-0.5 transition-all shrink-0`} />
                 </button>
 
                 {/* 2. Notice Button */}
@@ -419,19 +419,19 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
                       const targetUrl = quickLinks.dynamicUrl || 'https://college.edu';
                       window.open(targetUrl, '_blank', 'noopener,noreferrer');
                     }}
-                    className={`p-3.5 rounded-2xl border ${currentPreset.cardBorder} hover:border-amber-500 dark:hover:border-amber-400 bg-white/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
+                    className={`p-3.5 ${currentPreset.cardRadius} border ${currentPreset.cardBorder} ${currentPreset.cardBg} transition-all flex items-center justify-between gap-3 text-left shadow-xs hover:shadow-md group cursor-pointer`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <div className={`w-10 h-10 ${currentPreset.buttonRadius} ${currentPreset.innerCardBg} ${currentPreset.accentText} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform`}>
                         <Zap className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-sm font-black text-slate-900 dark:text-white block group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                        <span className={`text-sm font-black text-slate-900 dark:text-white block group-hover:${currentPreset.accentText} transition-colors`}>
                           Notice
                         </span>
                       </div>
                     </div>
-                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <ExternalLink className={`w-4 h-4 text-slate-400 group-hover:${currentPreset.accentText} group-hover:translate-x-0.5 transition-all shrink-0`} />
                   </button>
                 )}
               </div>
