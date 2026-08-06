@@ -15,6 +15,7 @@ import { BookOpen, Search, PlusCircle, BarChart2, Settings, QrCode, Lock } from 
 import { WorkInProgressView } from './components/WorkInProgressView';
 
 import { Book, College, LibraryStats } from './types';
+import { saveBooksToLocalDB, getBooksFromLocalDB, clearLocalDBForCollege } from './utils/dbStorage';
 
 function AppContent({
   colleges,
@@ -402,11 +403,53 @@ export default function App() {
 
   const fetchAdminBooks = async (collegeId: string) => {
     try {
+      // 1. Fetch server books
       const res = await fetch(`/api/books?collegeId=${collegeId}`);
       const data = await res.json();
-      setBooks(data.books || []);
+      let serverBooks: Book[] = data.books || [];
+
+      // 2. Read local IndexedDB backup
+      const { books: localBooks, meta } = await getBooksFromLocalDB(collegeId);
+
+      // Scenario A: User previously cleared the full sheet explicitly
+      if (meta && meta.isExplicitClear && localBooks.length === 0 && serverBooks.length > 0) {
+        console.log(`⚡ Preserving user's explicit clear state. Purging server default seed books...`);
+        await fetch(`/api/books/college/${collegeId}/clear`, { method: 'DELETE' });
+        setBooks([]);
+        return;
+      }
+
+      // Scenario B: Server container restarted/rebuilt and reset to default seed books (<= 15 books), BUT local IndexedDB has user's uploaded dataset (> 15 books or meta saved)
+      if (localBooks && localBooks.length > 15 && serverBooks.length <= 15 && (!meta || !meta.isExplicitClear)) {
+        console.log(`⚡ Server container reset detected. Restoring ${localBooks.length} books from local IndexedDB storage to server...`);
+        
+        const restoreRes = await fetch('/api/books/replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            books: localBooks,
+            collegeId
+          })
+        });
+
+        if (restoreRes.ok) {
+          setBooks(localBooks);
+          return;
+        }
+      }
+
+      // Scenario C: Use server books and keep local IndexedDB in sync
+      setBooks(serverBooks);
+      if (serverBooks.length > 0) {
+        saveBooksToLocalDB(collegeId, serverBooks, false);
+      }
     } catch (err) {
       console.error('Failed to fetch admin books:', err);
+      // Fallback to local IndexedDB if server request fails
+      const { books: localBooks } = await getBooksFromLocalDB(collegeId);
+      if (localBooks && localBooks.length > 0) {
+        setBooks(localBooks);
+      }
     }
   };
 
@@ -436,7 +479,7 @@ export default function App() {
         })
       });
       if (res.ok) {
-        fetchAdminBooks(currentCollege.id);
+        await fetchAdminBooks(currentCollege.id);
         fetchAdminStats(currentCollege.id);
       }
     } catch (err) {
@@ -457,7 +500,7 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        fetchAdminBooks(currentCollege.id);
+        await fetchAdminBooks(currentCollege.id);
         fetchAdminStats(currentCollege.id);
       }
       return data;
@@ -475,7 +518,7 @@ export default function App() {
         body: JSON.stringify(updatedData)
       });
       if (res.ok) {
-        fetchAdminBooks(currentCollege.id);
+        await fetchAdminBooks(currentCollege.id);
         fetchAdminStats(currentCollege.id);
       }
     } catch (err) {
@@ -488,7 +531,7 @@ export default function App() {
     try {
       const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        fetchAdminBooks(currentCollege.id);
+        await fetchAdminBooks(currentCollege.id);
         fetchAdminStats(currentCollege.id);
       }
     } catch (err) {
@@ -502,6 +545,7 @@ export default function App() {
       const res = await fetch(`/api/books/college/${currentCollege.id}/clear`, { method: 'DELETE' });
       if (res.ok) {
         setBooks([]);
+        await clearLocalDBForCollege(currentCollege.id);
         localStorage.removeItem('library_detected_form_schema');
         fetchAdminStats(currentCollege.id);
         return true;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Shield, Plus, Edit2, Trash2, Sparkles, RefreshCw, CheckCircle2, X, Search, BarChart2, QrCode, Settings, BookOpen, Building2, Printer, Copy, Check, FileSpreadsheet, Upload, Download, Users, ArrowLeftRight, Clock, HelpCircle, Coins, User, Sliders, RotateCcw, Layers, FileCode, Table, LayoutGrid, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Minimize2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Book, College, LibraryStats, IssuedBook } from '../types';
 import { AnalyticsView } from './AnalyticsView';
@@ -69,6 +70,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [searchFilter]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSheetFullscreen) {
+        setIsSheetFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSheetFullscreen]);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
@@ -1075,14 +1086,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </form>
           </div>
-          )}
-
-          {/* Book Catalog Table */}
-          <div className={`${isSheetFullscreen ? 'fixed inset-0 z-50 m-2 sm:m-6 overflow-y-auto' : (isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3')} ${currentPreset.cardBg} rounded-3xl p-3.5 sm:p-6 border ${currentPreset.cardBorder} shadow-2xl space-y-4 transition-all duration-300`}>
+          )}          {/* Book Catalog Table */}
+          <div className={`${isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3'} ${currentPreset.cardBg} rounded-3xl p-3.5 sm:p-6 border ${currentPreset.cardBorder} shadow-2xl space-y-4 transition-all duration-300`}>
             
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 border-b border-slate-200 dark:border-slate-800 pb-3.5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full md:w-auto">
-                {!isAddBookPanelOpen && !isSheetFullscreen && (
+                {!isAddBookPanelOpen && (
                   <button
                     type="button"
                     onClick={() => setIsAddBookPanelOpen(true)}
@@ -1096,7 +1105,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <BookOpen className={`w-5 h-5 ${currentPreset.accentText} shrink-0`} />
-                    <span>College Catalog ({books.length} Books) {isSheetFullscreen && <span className="text-xs bg-indigo-500/20 text-indigo-500 px-2 py-0.5 rounded-full font-mono">⚡ FULLSCREEN SHEET</span>}</span>
+                    <span>College Catalog ({books.length} Books)</span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
                     {currentCollege?.name} library database
@@ -1140,17 +1149,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const next = !isSheetFullscreen;
-                      setIsSheetFullscreen(next);
-                      if (next) {
-                        setIsAddBookPanelOpen(false);
-                      }
+                      setIsSheetFullscreen(true);
+                      setIsAddBookPanelOpen(false);
+                      if (pageSize < 100) setPageSize(100);
                     }}
-                    className={`py-2.5 px-3.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${isSheetFullscreen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30'} shrink-0`}
-                    title={isSheetFullscreen ? "Exit Fullscreen Sheet" : "Expand Sheet to Fullscreen (Hide form & maximize columns/rows)"}
+                    className="py-2.5 px-3.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 shrink-0"
+                    title="Expand Sheet to Fullscreen (Hide sidebar & maximize rows/columns)"
                   >
-                    {isSheetFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                    <span>{isSheetFullscreen ? "Exit Fullscreen" : "Fullscreen Sheet"}</span>
+                    <Maximize2 className="w-4 h-4" />
+                    <span>Fullscreen Sheet</span>
                   </button>
                 </div>
 
@@ -1206,11 +1213,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {!isAddBookPanelOpen && (
-                        <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                          FULLSCREEN ACTIVE
-                        </span>
-                      )}
                       <span className="font-mono text-slate-400 font-bold">{filteredBooks.length} Rows</span>
                     </div>
                   </div>
@@ -1436,10 +1438,312 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
             )}
-
           </div>
 
-        </div>
+          {/* ⚡ PURE FULLSCREEN OVERLAY PORTAL (100% Covers Screen, No Sidebar, Max Height) */}
+          {isSheetFullscreen && createPortal(
+            <div className="fixed inset-0 z-[99999] bg-slate-950 text-slate-100 flex flex-col p-3 sm:p-5 w-screen h-screen overflow-hidden font-sans select-none">
+              {/* Fullscreen Header Toolbar */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 mb-3 shrink-0 shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-lg shrink-0">
+                    <BookOpen className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <span>{currentCollege?.name} Catalog</span>
+                      <span className="text-xs font-mono bg-indigo-500/20 text-indigo-400 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                        ⚡ FULLSCREEN SHEET
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 font-medium">
+                      Displaying {filteredBooks.length.toLocaleString()} rows • {activeTableColumns.length} columns • Max Vertical Viewport
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Search Filter */}
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchFilter}
+                      onChange={e => setSearchFilter(e.target.value)}
+                      placeholder="Search catalog rows..."
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Rows per page selector in Fullscreen */}
+                  <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
+                    <span className="text-slate-400 font-semibold">Rows:</span>
+                    <select
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-slate-900 text-white font-extrabold border border-slate-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value={50}>50 rows</option>
+                      <option value={100}>100 rows</option>
+                      <option value={250}>250 rows</option>
+                      <option value={500}>500 rows</option>
+                      <option value={1000}>1000 rows</option>
+                      <option value={2500}>2500 rows</option>
+                      <option value={5000}>5000 rows</option>
+                      <option value={10000}>All Rows</option>
+                    </select>
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-800 rounded-xl border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setTableViewMode('sheet')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                        tableViewMode === 'sheet' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Table className="w-3.5 h-3.5" />
+                      <span>Exact Sheet ({activeTableColumns.length} Cols)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTableViewMode('standard')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                        tableViewMode === 'standard' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span>Standard</span>
+                    </button>
+                  </div>
+
+                  {/* EXIT FULLSCREEN BUTTON */}
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetFullscreen(false)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-xl flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-indigo-400/40 shrink-0 cursor-pointer"
+                    title="Exit Fullscreen Mode (or press ESC key)"
+                  >
+                    <Minimize2 className="w-4 h-4" />
+                    <span>Exit Fullscreen</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Fullscreen Scrollable Container - Maximizes Vertical Space */}
+              <div className="flex-1 min-h-0 w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-auto shadow-2xl relative scroll-smooth focus:outline-none">
+                {filteredBooks.length > 0 ? (
+                  tableViewMode === 'sheet' ? (
+                    <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+                      <thead className="sticky top-0 z-20 bg-slate-800 text-slate-200 font-black uppercase tracking-wider text-[10px] shadow-md">
+                        <tr>
+                          <th className="py-3 px-3 border-b border-r border-slate-700 bg-slate-800 text-center w-12 sticky left-0 z-30">
+                            #
+                          </th>
+                          {activeTableColumns.map((colHeader, idx) => (
+                            <th
+                              key={idx}
+                              className="py-3 px-3 border-b border-r border-slate-700 min-w-[150px] max-w-[320px]"
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-extrabold">{colHeader}</span>
+                                <span className="text-[9px] font-mono text-indigo-400 lowercase opacity-80">col</span>
+                              </div>
+                            </th>
+                          ))}
+                          <th className="py-3 px-3 border-b border-r border-slate-700 min-w-[130px] bg-amber-500/10 text-amber-300">
+                            Shelf Location
+                          </th>
+                          <th className="py-3 px-3 border-b border-slate-700 text-right sticky right-0 bg-slate-800 z-30 min-w-[90px]">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80 text-[11px] text-slate-200">
+                        {paginatedBooks.map((b, rowIdx) => (
+                          <tr key={b.id} className="hover:bg-indigo-950/40 transition-colors">
+                            <td className="py-2.5 px-3 border-r border-slate-800 text-slate-400 text-center font-mono font-bold bg-slate-900/80 sticky left-0 z-10">
+                              {(currentPage - 1) * pageSize + rowIdx + 1}
+                            </td>
+                            {activeTableColumns.map((colHeader, colIdx) => {
+                              const cellValue = getCellValue(b, colHeader);
+                              const isLink = cellValue.startsWith('http://') || cellValue.startsWith('https://');
+
+                              return (
+                                <td
+                                  key={colIdx}
+                                  className="py-2.5 px-3 border-r border-slate-800 max-w-[300px] truncate font-sans text-slate-200"
+                                  title={cellValue}
+                                >
+                                  {isLink ? (
+                                    <a
+                                      href={cellValue}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-indigo-400 hover:underline flex items-center gap-1 inline-flex font-medium"
+                                    >
+                                      <span className="truncate max-w-[200px]">{cellValue}</span>
+                                      <ExternalLink className="w-3 h-3 shrink-0" />
+                                    </a>
+                                  ) : (
+                                    <span>{cellValue}</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="py-2.5 px-3 border-r border-slate-800 font-mono font-bold text-amber-400">
+                              {b.location.almariNumber} - {b.location.rowNumber} ({b.location.shelfPosition})
+                            </td>
+                            <td className="py-2.5 px-3 text-right sticky right-0 bg-slate-900 z-10">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => {
+                                    setIsSheetFullscreen(false);
+                                    handleStartEdit(b);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400"
+                                  title="Edit Book"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setBookToDelete(b)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                                  title="Delete Book"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    /* Standard Catalog Table in Fullscreen */
+                    <table className="w-full text-left text-xs">
+                      <thead className="sticky top-0 z-20 bg-slate-800 text-slate-200 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-3 px-3">Book Title & Author</th>
+                          <th className="py-3 px-3">Dept</th>
+                          <th className="py-3 px-3">Shelf Location</th>
+                          <th className="py-3 px-3">Copies</th>
+                          <th className="py-3 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {paginatedBooks.map(b => (
+                          <tr key={b.id} className="hover:bg-slate-800/50 transition-colors">
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-white text-sm">{b.title}</div>
+                              <div className="text-xs text-slate-400">by {b.author}</div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-bold text-xs">
+                                {b.department}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-amber-400">
+                              {b.location.almariNumber} - {b.location.rowNumber} ({b.location.shelfPosition})
+                            </td>
+                            <td className="py-3 px-3 font-bold text-emerald-400">
+                              {b.availableCopies}/{b.totalCopies}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => {
+                                    setIsSheetFullscreen(false);
+                                    handleStartEdit(b);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setBookToDelete(b)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                ) : (
+                  <div className="py-16 text-center text-slate-400 text-sm">
+                    No books match your filter criteria in {currentCollege?.name}'s catalog.
+                  </div>
+                )}
+              </div>
+
+              {/* Fullscreen Footer / Pagination Bar */}
+              <div className="mt-3 bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300 font-medium shrink-0 shadow-2xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Showing <strong className="text-white">{Math.min((currentPage - 1) * pageSize + 1, filteredBooks.length)}</strong> to <strong className="text-white">{Math.min(currentPage * pageSize, filteredBooks.length)}</strong> of <strong className="text-indigo-400">{filteredBooks.length.toLocaleString()}</strong> books</span>
+                  <div className="flex items-center gap-1.5 ml-3">
+                    <span className="text-slate-400">Rows per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-white focus:outline-none"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={250}>250</option>
+                      <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                      <option value={2500}>2500</option>
+                      <option value={5000}>5000</option>
+                      <option value={10000}>10000 (All)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 font-bold text-white transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <span className="px-3 font-mono font-bold text-white bg-slate-800 py-1.5 rounded-xl border border-slate-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 font-bold text-white transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+          </div>
         </motion.div>
       )}
 

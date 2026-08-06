@@ -71,7 +71,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const { theme, toggleTheme, colorTheme, setColorTheme, currentPreset } = useTheme();
 
-  // Modal State for College Info Editor, Theme Selector & Control Panel Modals
+  // 💾 Download / Restore JSON Catalog Backup
+  const handleDownloadBackup = () => {
+    if (!books || books.length === 0) {
+      alert('Your catalog is currently empty.');
+      return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(books, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${(currentCollege?.code || 'library').toLowerCase()}_catalog_backup_${books.length}_books.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleRestoreBackupFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        const booksArray = Array.isArray(parsed) ? parsed : (parsed.books || []);
+        if (booksArray.length === 0) {
+          alert('No valid book records found in the selected JSON file.');
+          return;
+        }
+        if (confirm(`Restore ${booksArray.length} books into ${currentCollege?.name || 'your college'} catalog?`)) {
+          const res = await fetch('/api/books/replace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              books: booksArray,
+              collegeId: currentCollege?.id
+            })
+          });
+          if (res.ok) {
+            window.location.reload();
+          }
+        }
+      } catch (err: any) {
+        alert('Error reading JSON backup file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
   const [isCollegeModalOpen, setIsCollegeModalOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isControlPanelModalOpen, setIsControlPanelModalOpen] = useState(false);
@@ -567,6 +614,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Option 4: Dataset Persistence & Backup Card */}
+        <div className={`${currentPreset.cardBg} rounded-[28px] p-6 border ${currentPreset.cardBorder} shadow-xl flex flex-col justify-between space-y-5 transition-all duration-500`}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className={`w-12 h-12 rounded-2xl ${currentPreset.buttonBg} flex items-center justify-center shadow-lg`}>
+                <Zap className="w-6 h-6 text-amber-300" />
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>IndexedDB Storage Active</span>
+              </span>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Dataset Auto-Sync & Backup</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Your uploaded sheets (up to 50,000+ books) are automatically synced to your browser's IndexedDB. Even when app code changes are committed or dev server restarts, your uploaded catalog auto-restores instantly!
+              </p>
+            </div>
+
+            <div className={`p-3.5 ${currentPreset.innerCardBg} rounded-2xl border ${currentPreset.borderColor} space-y-2 text-xs`}>
+              <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                <span>Active Catalog Records:</span>
+                <span className="font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-lg border border-indigo-500/20">
+                  {books.length.toLocaleString()} Books
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                You can also export a 1-click JSON backup file or restore a previous JSON backup anytime.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleDownloadBackup}
+              className={`py-3 px-3 ${currentPreset.buttonBg} font-extrabold text-xs rounded-2xl shadow-md flex items-center justify-center gap-2 transition-all hover:scale-[1.01]`}
+            >
+              <Download className="w-4 h-4" />
+              <span>Download JSON Backup</span>
+            </button>
+
+            <label className="py-3 px-3 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs rounded-2xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-700">
+              <RefreshCw className="w-4 h-4 text-indigo-400" />
+              <span>Restore JSON Backup</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleRestoreBackupFile}
+                className="hidden"
+              />
+            </label>
           </div>
         </div>
 

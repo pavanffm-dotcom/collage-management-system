@@ -984,6 +984,31 @@ app.delete('/api/books/college/:collegeId/clear', (req, res) => {
   res.json({ success: true, message: 'All books cleared for college catalog' });
 });
 
+// POST /api/books/replace - Replace entire catalog for a college with restored dataset
+app.post('/api/books/replace', (req, res) => {
+  const { books: incomingBooks, collegeId } = req.body;
+  if (!Array.isArray(incomingBooks)) {
+    return res.status(400).json({ error: 'Array of books is required' });
+  }
+
+  const targetCollegeId = collegeId || 'col-gec-goa';
+  // Remove existing books for target college
+  booksCatalog = booksCatalog.filter(b => b.collegeId !== targetCollegeId);
+
+  // Add all incoming books
+  const formattedBooks = incomingBooks.map((b, idx) => ({
+    ...b,
+    collegeId: targetCollegeId,
+    id: b.id || `bk-restored-${Date.now()}-${idx}`
+  }));
+
+  booksCatalog.push(...formattedBooks);
+  saveData();
+
+  console.log(`Replaced catalog for college ${targetCollegeId} with ${formattedBooks.length} books.`);
+  res.json({ success: true, count: formattedBooks.length, message: `Catalog replaced with ${formattedBooks.length} books.` });
+});
+
 // POST /api/search/exact - Title/Author/ISBN/Subject/CSV Sheet search
 app.post('/api/search/exact', (req, res) => {
   const { query, department, category, onlyAvailable, collegeId, limit, searchMappings: reqMappings } = req.body;
