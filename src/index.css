@@ -102,6 +102,55 @@
   --theme-badge-dark-text: #c7d2fe;
 }
 
+[data-color-theme="superblack"] {
+  --theme-primary: #ffffff;
+  --theme-primary-hover: #e4e4e7;
+  --theme-primary-light: #18181b;
+  --theme-primary-dark-bg: #18181b;
+  --theme-primary-border: #3f3f46;
+  --theme-primary-text: #ffffff;
+  --theme-primary-dark-text: #ffffff;
+  --theme-gradient-from: #27272a;
+  --theme-gradient-to: #000000;
+  --theme-glow: 0 0 0 transparent;
+  --theme-badge-bg: #ffffff;
+  --theme-badge-text: #000000;
+  --theme-badge-dark-bg: #ffffff;
+  --theme-badge-dark-text: #000000;
+}
+
+/* 100% Strict Pure Monochrome Black & White Overrides for Super Black OLED */
+[data-color-theme="superblack"] {
+  filter: grayscale(100%) !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+[data-color-theme="turbo"] {
+  --theme-primary: #10b981;
+  --theme-primary-hover: #059669;
+  --theme-primary-light: #ecfdf5;
+  --theme-primary-dark-bg: rgba(6, 78, 59, 0.4);
+  --theme-primary-border: rgba(16, 185, 129, 0.3);
+  --theme-primary-text: #10b981;
+  --theme-primary-dark-text: #34d399;
+  --theme-gradient-from: #10b981;
+  --theme-gradient-to: #06b6d4;
+  --theme-glow: 0 0 0 transparent;
+  --theme-badge-bg: #ecfdf5;
+  --theme-badge-text: #047857;
+  --theme-badge-dark-bg: rgba(6, 78, 59, 0.6);
+  --theme-badge-dark-text: #a7f3d0;
+}
+
+/* Max FPS Performance Overrides: Disable heavy GPU filters & backdrop-blurs when Turbo Mode is active */
+[data-color-theme="turbo"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
 /* Custom Dynamic Theme Utilities */
 .bg-theme-primary {
   background-color: var(--theme-primary) !important;

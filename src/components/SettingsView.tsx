@@ -482,7 +482,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Application Themes
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Select from 5 professionally designed glassmorphic color palettes.
+                Select from high-performance & glassmorphic color themes (including ⚡ Max FPS Turbo Mode).
               </p>
             </div>
 

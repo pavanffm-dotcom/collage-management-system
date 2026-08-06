@@ -64,6 +64,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [isSheetFullscreen, setIsSheetFullscreen] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1077,11 +1078,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
 
           {/* Book Catalog Table */}
-          <div className={`${isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3'} ${currentPreset.cardBg} rounded-3xl p-3.5 sm:p-6 border ${currentPreset.cardBorder} shadow-xl space-y-4 transition-all duration-300`}>
+          <div className={`${isSheetFullscreen ? 'fixed inset-0 z-50 m-2 sm:m-6 overflow-y-auto' : (isAddBookPanelOpen ? 'lg:col-span-2' : 'lg:col-span-3')} ${currentPreset.cardBg} rounded-3xl p-3.5 sm:p-6 border ${currentPreset.cardBorder} shadow-2xl space-y-4 transition-all duration-300`}>
             
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 border-b border-slate-200 dark:border-slate-800 pb-3.5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full md:w-auto">
-                {!isAddBookPanelOpen && (
+                {!isAddBookPanelOpen && !isSheetFullscreen && (
                   <button
                     type="button"
                     onClick={() => setIsAddBookPanelOpen(true)}
@@ -1095,7 +1096,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <BookOpen className={`w-5 h-5 ${currentPreset.accentText} shrink-0`} />
-                    <span>College Catalog ({books.length} Books)</span>
+                    <span>College Catalog ({books.length} Books) {isSheetFullscreen && <span className="text-xs bg-indigo-500/20 text-indigo-500 px-2 py-0.5 rounded-full font-mono">⚡ FULLSCREEN SHEET</span>}</span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
                     {currentCollege?.name} library database
@@ -1105,32 +1106,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
                 {/* View Mode Toggle Buttons */}
-                <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 w-full sm:w-auto">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setTableViewMode('sheet')}
+                      className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        tableViewMode === 'sheet'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title="Display exact rows and columns from Excel/CSV file"
+                    >
+                      <Table className="w-3.5 h-3.5 shrink-0" />
+                      <span>Exact Sheet ({activeTableColumns.length} Cols)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTableViewMode('standard')}
+                      className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        tableViewMode === 'standard'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title="Display compact standard catalog cards"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                      <span>Standard View</span>
+                    </button>
+                  </div>
+
+                  {/* Fullscreen Sheet Toggle Button */}
                   <button
                     type="button"
-                    onClick={() => setTableViewMode('sheet')}
-                    className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      tableViewMode === 'sheet'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="Display exact rows and columns from Excel/CSV file"
+                    onClick={() => {
+                      const next = !isSheetFullscreen;
+                      setIsSheetFullscreen(next);
+                      if (next) {
+                        setIsAddBookPanelOpen(false);
+                      }
+                    }}
+                    className={`py-2.5 px-3.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${isSheetFullscreen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30'} shrink-0`}
+                    title={isSheetFullscreen ? "Exit Fullscreen Sheet" : "Expand Sheet to Fullscreen (Hide form & maximize columns/rows)"}
                   >
-                    <Table className="w-3.5 h-3.5 shrink-0" />
-                    <span>Exact Sheet ({activeTableColumns.length} Cols)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTableViewMode('standard')}
-                    className={`py-2 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      tableViewMode === 'standard'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="Display compact standard catalog cards"
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                    <span>Standard View</span>
+                    {isSheetFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    <span>{isSheetFullscreen ? "Exit Fullscreen" : "Fullscreen Sheet"}</span>
                   </button>
                 </div>
 

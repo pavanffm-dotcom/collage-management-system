@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export type LightDarkTheme = 'light' | 'dark';
-export type ColorTheme = 'lavender' | 'peach' | 'mint' | 'cyber' | 'rose' | 'superblack' | 'glass' | 'clayglass' | 'blueprint3d';
+export type ColorTheme = 'lavender' | 'peach' | 'mint' | 'cyber' | 'rose' | 'superblack' | 'glass' | 'clayglass' | 'blueprint3d' | 'turbo';
 
 export interface ThemePreset {
   id: ColorTheme;
@@ -177,31 +177,31 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: 'superblack',
-    name: 'Super Black OLED',
+    name: 'Super Black OLED (100% B&W)',
     emoji: '🖤',
-    tagline: 'Pure OLED monochrome pitch black & high-contrast soft rounded square layout',
-    gradientBg: 'from-zinc-900 via-black to-zinc-950',
+    tagline: '100% Pure Monochrome Pitch Black & White (Zero colors)',
+    gradientBg: 'from-black via-black to-black',
     bannerBg: 'from-black via-zinc-950 to-black border-zinc-800',
-    buttonBg: 'bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-extrabold shadow-md shadow-black/10 dark:shadow-white/10',
-    accentText: 'text-zinc-950 dark:text-white font-mono font-black',
-    badgeBg: 'bg-zinc-900 text-white dark:bg-white dark:text-black border border-zinc-800 dark:border-zinc-200 font-mono font-bold',
-    borderColor: 'border-zinc-300 dark:border-zinc-800',
-    previewColors: ['#000000', '#27272a', '#ffffff'],
-    pageBg: 'bg-zinc-100 dark:bg-black',
-    cardBg: 'bg-white dark:bg-[#080808] backdrop-blur-md',
-    cardBorder: 'border border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600',
-    innerCardBg: 'bg-zinc-100/80 dark:bg-[#121212] backdrop-blur-xs',
-    headerBg: 'bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800',
-    heroCardBg: 'bg-white dark:bg-[#0d0d0d] text-zinc-950 dark:text-white border border-zinc-300 dark:border-zinc-800 shadow-2xl shadow-black/5 dark:shadow-black/80',
-    inputBg: 'bg-zinc-50 dark:bg-[#121212] border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 font-mono',
-    secondaryButtonBg: 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 font-bold',
-    modalBg: 'bg-white dark:bg-[#0c0c0c] border border-zinc-300 dark:border-zinc-800',
-    glowShadow: 'shadow-2xl shadow-white/5',
+    buttonBg: 'bg-white hover:bg-zinc-200 text-black dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-extrabold shadow-none',
+    accentText: 'text-white dark:text-white font-mono font-black',
+    badgeBg: 'bg-white text-black dark:bg-white dark:text-black border border-white font-mono font-bold',
+    borderColor: 'border-zinc-800 dark:border-zinc-800',
+    previewColors: ['#000000', '#18181b', '#ffffff'],
+    pageBg: 'bg-black dark:bg-black',
+    cardBg: 'bg-[#000000] dark:bg-[#000000]',
+    cardBorder: 'border border-zinc-800 hover:border-zinc-600',
+    innerCardBg: 'bg-[#0a0a0a] dark:bg-[#0a0a0a]',
+    headerBg: 'bg-black dark:bg-black border-b border-zinc-800',
+    heroCardBg: 'bg-black dark:bg-black text-white border border-zinc-800 shadow-none',
+    inputBg: 'bg-[#0d0d0d] dark:bg-[#0d0d0d] border border-zinc-800 text-white placeholder-zinc-500 font-mono',
+    secondaryButtonBg: 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-white border border-zinc-800 font-bold',
+    modalBg: 'bg-black dark:bg-black border border-zinc-800',
+    glowShadow: 'shadow-none',
     cardRadius: 'rounded-2xl',
     buttonRadius: 'rounded-xl',
     inputRadius: 'rounded-xl',
     badgeRadius: 'rounded-lg',
-    cardExtraClass: 'border border-zinc-300 dark:border-zinc-800 shadow-xl shadow-black/5 dark:shadow-black/80'
+    cardExtraClass: 'border border-zinc-800 shadow-none'
   },
   {
     id: 'glass',
@@ -286,6 +286,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     inputRadius: 'rounded-2xl',
     badgeRadius: 'rounded-xl',
     cardExtraClass: 'ring-1 ring-indigo-500/10 dark:ring-cyan-500/20 shadow-2xl'
+  },
+  {
+    id: 'turbo',
+    name: '⚡ Max FPS Turbo Mode',
+    emoji: '⚡',
+    tagline: 'Ultra-fast 120 FPS performance mode with zero backdrop-blur overhead & crisp GPU rendering',
+    gradientBg: 'from-emerald-500/20 via-teal-500/10 to-cyan-500/20',
+    bannerBg: 'from-slate-900 via-zinc-900 to-black border-emerald-500/50',
+    buttonBg: 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-none active:scale-95 transition-transform',
+    accentText: 'text-emerald-500 dark:text-emerald-400 font-extrabold',
+    badgeBg: 'bg-emerald-500/10 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 font-mono font-bold',
+    borderColor: 'border-emerald-500/30 dark:border-emerald-800/50',
+    previewColors: ['#10b981', '#06b6d4', '#0f172a'],
+    pageBg: 'bg-slate-100 dark:bg-[#070a0f]',
+    cardBg: 'bg-white dark:bg-[#0e131d]',
+    cardBorder: 'border border-slate-300 dark:border-emerald-900/60 hover:border-emerald-500 dark:hover:border-emerald-400',
+    innerCardBg: 'bg-slate-50 dark:bg-[#141b29]',
+    headerBg: 'bg-white dark:bg-[#090d14] border-b border-slate-200 dark:border-emerald-950',
+    heroCardBg: 'bg-slate-900 text-white border border-emerald-500/40 shadow-none',
+    inputBg: 'bg-slate-50 dark:bg-[#121824] border border-slate-300 dark:border-emerald-900/60 text-slate-900 dark:text-emerald-100 placeholder-slate-400 font-mono',
+    secondaryButtonBg: 'bg-slate-200 hover:bg-slate-300 dark:bg-[#182030] dark:hover:bg-[#1f2a3e] text-slate-900 dark:text-emerald-200 border border-slate-300 dark:border-emerald-900/40 font-bold',
+    modalBg: 'bg-white dark:bg-[#0d121c] border border-emerald-500/40',
+    glowShadow: 'shadow-none',
+    cardRadius: 'rounded-2xl',
+    buttonRadius: 'rounded-xl',
+    inputRadius: 'rounded-xl',
+    badgeRadius: 'rounded-lg',
+    cardExtraClass: 'border-l-4 border-l-emerald-500 shadow-none'
   }
 ];
 
@@ -361,7 +389,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       themeMeta.setAttribute('name', 'theme-color');
       document.head.appendChild(themeMeta);
     }
-    const hexBg = colorTheme === 'superblack' ? '#000000' : (theme === 'dark' ? '#090d16' : '#f8fafc');
+    const hexBg = colorTheme === 'superblack' ? '#000000' : (colorTheme === 'turbo' ? '#070a0f' : (theme === 'dark' ? '#090d16' : '#f8fafc'));
     themeMeta.setAttribute('content', hexBg);
   }, [colorTheme, theme]);
 
