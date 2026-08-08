@@ -52,7 +52,7 @@ interface HeaderProps {
   onOpenInstallModal?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   currentCollege,
   authUser,
   onOpenAuthModal,
@@ -450,4 +450,4 @@ export const Header: React.FC<HeaderProps> = ({
       )}
     </>
   );
-};
+});

@@ -3,6 +3,9 @@ export type ShelfPosition = 'Top' | 'Middle' | 'Bottom' | 'LEFT' | 'MIDDLE' | 'R
 export interface SearchColumnMapping {
   nameColumns: string[];   // Catalog/sheet columns connected to "Search by Book Name"
   aiColumns: string[];     // Catalog/sheet columns connected to "Search with AI"
+  barcodeColumns?: string[]; // Catalog/sheet columns connected to Barcode/QR Code detection
+  columnColumns?: string[];  // Catalog/sheet columns connected to Shelf Column (Col 1-4)
+  defaultColumnPos?: number; // Default column 1..4 (1: Left, 2: Left Middle, 3: Right Middle, 4: Right)
   autoConnectMatchedHeaders?: boolean;
 }
 
@@ -19,9 +22,11 @@ export interface College {
 
 export interface ShelfLocation {
   almariNumber: string; // e.g. "A7" or "7"
-  rowNumber: string;    // e.g. "R3" or "3"
+  rowNumber: string;    // e.g. "R3" or "Row 3"
+  columnNumber?: string; // e.g. "Col 3" or "3"
+  columnName?: string;   // e.g. "Right Middle" | "Left" | "Left Middle" | "Right"
   shelfPosition: ShelfPosition; // "Top" | "Middle" | "Bottom"
-  shelfCode: string;    // e.g. "A7-R3-M"
+  shelfCode: string;    // e.g. "A7-R3-C3"
   sectionName?: string; // e.g. "Regional Cooking & Heritage"
 }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MapPin, Sparkles, Layers, BookOpen, Lock, FileSpreadsheet, Cpu } from 'lucide-react';
 import { Book } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -9,7 +9,29 @@ interface GrandWoodenAlmariProps {
   showDetailsBadge?: boolean;
 }
 
-export const GrandWoodenAlmari: React.FC<GrandWoodenAlmariProps> = ({
+// Global cached config list to eliminate localStorage & JSON.parse on every card render
+let cachedAlmariList: any[] | null = null;
+let lastAlmariReadTime = 0;
+
+function getCachedAlmariConfigs(): any[] {
+  const now = Date.now();
+  if (cachedAlmariList === null || now - lastAlmariReadTime > 2000) {
+    try {
+      const raw = localStorage.getItem('gec_almari_configs');
+      if (raw) {
+        cachedAlmariList = JSON.parse(raw);
+      } else {
+        cachedAlmariList = [];
+      }
+    } catch (e) {
+      cachedAlmariList = [];
+    }
+    lastAlmariReadTime = now;
+  }
+  return cachedAlmariList || [];
+}
+
+export const GrandWoodenAlmari: React.FC<GrandWoodenAlmariProps> = React.memo(({
   book,
   onOpenMap,
   showDetailsBadge = true
@@ -17,19 +39,18 @@ export const GrandWoodenAlmari: React.FC<GrandWoodenAlmariProps> = ({
   const { currentPreset } = useTheme();
 
   // Parse Almari Number (e.g. "Almari 3" -> 3)
-  const almariNum = parseInt(book.location.almariNumber.replace(/\D/g, ''), 10) || 1;
+  const almariNum = useMemo(() => {
+    return parseInt(book.location.almariNumber.replace(/\D/g, ''), 10) || 1;
+  }, [book.location.almariNumber]);
 
-  // Check if saved Almirah config exists in localStorage
-  let savedConfig: { rowCount?: number; designType?: string; name?: string } | null = null;
-  try {
-    const raw = localStorage.getItem('gec_almari_configs');
-    if (raw) {
-      const list = JSON.parse(raw);
-      if (Array.isArray(list)) {
-        savedConfig = list.find((item: any) => item.almariNum === almariNum) || null;
-      }
+  // Check if saved Almirah config exists in cached list
+  const savedConfig = useMemo(() => {
+    const list = getCachedAlmariConfigs();
+    if (Array.isArray(list)) {
+      return list.find((item: any) => item.almariNum === almariNum) || null;
     }
-  } catch (e) {}
+    return null;
+  }, [almariNum]);
 
   // Determine design category properties based on savedConfig or almariNum % 5
   // Total 5 distinct size categories:
@@ -119,14 +140,38 @@ export const GrandWoodenAlmari: React.FC<GrandWoodenAlmariProps> = ({
   };
 
   // Calculate target column index (0..totalCols-1)
-  const getTargetColIndex = (bookId: string, accessionNo?: string) => {
-    const raw = (accessionNo || bookId || '1').replace(/\D/g, '');
+  const getTargetColIndex = (bookData: Book) => {
+    // 1. Check explicit columnNumber (e.g. "Col 3" -> 2, "3" -> 2)
+    if (bookData.location?.columnNumber) {
+      const parsed = parseInt(bookData.location.columnNumber.replace(/\D/g, ''), 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= totalCols) {
+        return parsed - 1;
+      }
+    }
+    // 2. Check columnName or shelfPosition (e.g. "Left" -> 0, "Left Middle" -> 1, "Right Middle" -> 2, "Right" -> 3)
+    const name = (bookData.location?.columnName || bookData.location?.shelfPosition || '').toLowerCase();
+    if (name.includes('left middle') || name.includes('left-middle')) return 1;
+    if (name.includes('right middle') || name.includes('right-middle')) return 2;
+    if (name.includes('left')) return 0;
+    if (name.includes('right')) return 3;
+
+    // 3. Check shelfCode (e.g. "A-01-R1-C3")
+    if (bookData.location?.shelfCode) {
+      const match = bookData.location.shelfCode.match(/-C([1-4])/i);
+      if (match) {
+        const cNum = parseInt(match[1], 10);
+        if (cNum >= 1 && cNum <= totalCols) return cNum - 1;
+      }
+    }
+
+    // Fallback: Default to Col 3 (Right Middle) if unmapped or modulo accession
+    const raw = (bookData.accessionNumber || bookData.id || '1').replace(/\D/g, '');
     const num = parseInt(raw.slice(-2), 10) || parseInt(raw.slice(-1), 10) || 1;
     return num % totalCols;
   };
 
   const targetRowIdx = getTargetRowIndex(book.location.rowNumber, book.location.shelfPosition);
-  const targetColIdx = getTargetColIndex(book.id, book.accessionNumber);
+  const targetColIdx = getTargetColIndex(book);
 
   // Decorative book spine colors
   const bookColors = [
@@ -277,5 +322,5 @@ export const GrandWoodenAlmari: React.FC<GrandWoodenAlmariProps> = ({
       </div>
     </div>
   );
-};
+});
 

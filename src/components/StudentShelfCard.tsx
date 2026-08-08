@@ -11,7 +11,7 @@ interface StudentShelfCardProps {
   onBorrow: (book: Book) => void;
 }
 
-export const StudentShelfCard: React.FC<StudentShelfCardProps> = ({ book, aiResult, onSelectBook, onBorrow }) => {
+export const StudentShelfCard: React.FC<StudentShelfCardProps> = React.memo(({ book, aiResult, onSelectBook, onBorrow }) => {
   const { currentPreset } = useTheme();
   const isAvailable = book.availability === 'Available' && book.availableCopies > 0;
 
@@ -90,4 +90,4 @@ export const StudentShelfCard: React.FC<StudentShelfCardProps> = ({ book, aiResu
 
     </div>
   );
-};
+});

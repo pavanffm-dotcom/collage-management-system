@@ -393,18 +393,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     themeMeta.setAttribute('content', hexBg);
   }, [colorTheme, theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = React.useCallback(() => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  };
+  }, []);
 
-  const setColorTheme = (ct: ColorTheme) => {
+  const setColorTheme = React.useCallback((ct: ColorTheme) => {
     setColorThemeState(ct);
-  };
+  }, []);
 
   const currentPreset = THEME_PRESETS.find(p => p.id === colorTheme) || THEME_PRESETS[0];
 
+  const value = React.useMemo(() => ({
+    theme,
+    toggleTheme,
+    colorTheme,
+    setColorTheme,
+    currentPreset
+  }), [theme, toggleTheme, colorTheme, setColorTheme, currentPreset]);
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, colorTheme, setColorTheme, currentPreset }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

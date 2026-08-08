@@ -18,7 +18,7 @@ interface PublicStudentViewProps {
   onOpenQRModal?: () => void;
 }
 
-export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
+export const PublicStudentView: React.FC<PublicStudentViewProps> = React.memo(({
   currentCollege,
   colleges,
   onSelectCollege,
@@ -636,4 +636,4 @@ export const PublicStudentView: React.FC<PublicStudentViewProps> = ({
 
     </div>
   );
-};
+});

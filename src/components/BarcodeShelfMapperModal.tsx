@@ -62,10 +62,18 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
-  // Almari & Shelf Row
+  // Almari, Shelf Row & 4 Columns
   const [selectedAlmari, setSelectedAlmari] = useState<string>('A-01');
   const [selectedRow, setSelectedRow] = useState<number>(2);
+  const [selectedCol, setSelectedCol] = useState<number>(3); // 1: Left, 2: Left Middle, 3: Right Middle, 4: Right
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const columnNamesMap: Record<number, string> = {
+    1: 'Left',
+    2: 'Left Middle',
+    3: 'Right Middle',
+    4: 'Right'
+  };
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const almarisList = ['A-01', 'A-02', 'A-03', 'A-04', 'A-05', 'A-06', 'A-07', 'A-08', 'B-01', 'B-02', 'C-01'];
@@ -196,6 +204,10 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
       const rNum = parseInt(book.location.rowNumber.replace(/\D/g, ''), 10);
       if (!isNaN(rNum) && rNum >= 1 && rNum <= 4) setSelectedRow(rNum);
     }
+    if (book.location?.columnNumber) {
+      const cNum = parseInt(book.location.columnNumber.replace(/\D/g, ''), 10);
+      if (!isNaN(cNum) && cNum >= 1 && cNum <= 4) setSelectedCol(cNum);
+    }
   };
 
   const handleBarcodeSearch = (codeToSearch: string) => {
@@ -253,6 +265,10 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
         const rNum = parseInt(found.location.rowNumber.replace(/\D/g, ''), 10);
         if (!isNaN(rNum) && rNum >= 1 && rNum <= 4) setSelectedRow(rNum);
       }
+      if (found.location?.columnNumber) {
+        const cNum = parseInt(found.location.columnNumber.replace(/\D/g, ''), 10);
+        if (!isNaN(cNum) && cNum >= 1 && cNum <= 4) setSelectedCol(cNum);
+      }
     } else {
       setMatchedBook(null);
       setScanStatus('not_found');
@@ -267,12 +283,17 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
     }
 
     const rowName = `Row ${selectedRow}`;
+    const colName = columnNamesMap[selectedCol] || 'Right Middle';
+    const colNumberStr = `Col ${selectedCol}`;
+
     const updatedLocation = {
       almariNumber: selectedAlmari,
       rowNumber: rowName,
-      shelfPosition: 'Center' as any,
-      shelfCode: `${selectedAlmari}-R${selectedRow}`,
-      sectionName: `${selectedAlmari} - Row ${selectedRow}`
+      columnNumber: colNumberStr,
+      columnName: colName,
+      shelfPosition: colName as any,
+      shelfCode: `${selectedAlmari}-R${selectedRow}-C${selectedCol}`,
+      sectionName: `${selectedAlmari} - Row ${selectedRow}, ${colNumberStr} (${colName})`
     };
 
     const updatedData: Partial<Book> = {
@@ -280,7 +301,8 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
       rawCsvData: {
         ...(matchedBook.rawCsvData || {}),
         'Almari': selectedAlmari,
-        'Row': rowName
+        'Row': rowName,
+        'Column': `${colNumberStr} (${colName})`
       }
     };
 
@@ -290,7 +312,7 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
 
     setMatchedBook(prev => prev ? { ...prev, ...updatedData } : null);
     playBeepSound();
-    setToastMessage(`✓ Saved! "${matchedBook.title.substring(0, 22)}..." assigned to Almari ${selectedAlmari}, Row ${selectedRow}`);
+    setToastMessage(`✓ Saved! "${matchedBook.title.substring(0, 20)}..." assigned to Almari ${selectedAlmari}, Row ${selectedRow}, Col ${selectedCol} (${colName})`);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -654,11 +676,49 @@ export const BarcodeShelfMapperModal: React.FC<BarcodeShelfMapperModalProps> = (
                             onChange={(e) => setSelectedRow(Number(e.target.value))}
                             className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-bold font-mono text-slate-900 dark:text-white"
                           >
-                            <option value={1}>Row 1 (Top Shelf)</option>
-                            <option value={2}>Row 2 (Upper Shelf)</option>
-                            <option value={3}>Row 3 (Lower Shelf)</option>
-                            <option value={4}>Row 4 (Bottom Shelf)</option>
+                            <option value={1}>Row 1 (Top Shelf - R1)</option>
+                            <option value={2}>Row 2 (Upper Shelf - R2)</option>
+                            <option value={3}>Row 3 (Lower Shelf - R3)</option>
+                            <option value={4}>Row 4 (Bottom Shelf - R4)</option>
                           </select>
+                        </div>
+                      </div>
+
+                      {/* 4 Column Precision Selector */}
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                          <span>Shelf Column Position (1 to 4):</span>
+                          <span className="text-rose-500 dark:text-rose-400 font-extrabold font-mono">
+                            Selected: Col {selectedCol} ({columnNamesMap[selectedCol]})
+                          </span>
+                        </label>
+
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { num: 1, label: 'Col 1', sub: 'Left' },
+                            { num: 2, label: 'Col 2', sub: 'Left Middle' },
+                            { num: 3, label: 'Col 3', sub: 'Right Middle' },
+                            { num: 4, label: 'Col 4', sub: 'Right' }
+                          ].map(col => {
+                            const isSelected = selectedCol === col.num;
+                            return (
+                              <button
+                                key={col.num}
+                                type="button"
+                                onClick={() => setSelectedCol(col.num)}
+                                className={`py-1.5 px-1 rounded-xl text-center transition-all border font-mono ${
+                                  isSelected
+                                    ? 'bg-rose-500 text-white border-rose-600 shadow-md ring-2 ring-rose-400/50 scale-[1.02]'
+                                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-indigo-400'
+                                }`}
+                              >
+                                <span className="block text-[11px] font-black">{col.label}</span>
+                                <span className={`block text-[8px] font-extrabold tracking-tight truncate ${isSelected ? 'text-amber-200' : 'text-slate-400'}`}>
+                                  {col.sub}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 

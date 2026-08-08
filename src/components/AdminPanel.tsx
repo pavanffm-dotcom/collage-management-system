@@ -36,7 +36,7 @@ interface AdminPanelProps {
   onOpenInstallModal?: () => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({
+export const AdminPanel: React.FC<AdminPanelProps> = React.memo(({
   books,
   onAddBook,
   onBulkAddBooks,
@@ -717,22 +717,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const query = searchFilter.toLowerCase().trim();
     return books.filter(b => {
       const title = (b.title || '').toLowerCase();
+      if (title.includes(query)) return true;
       const author = (b.author || '').toLowerCase();
-      const dept = (b.department || '').toLowerCase();
+      if (author.includes(query)) return true;
       const acc = (b.accessionNumber || '').toLowerCase();
+      if (acc.includes(query)) return true;
       const isbn = (b.isbn || '').toLowerCase();
+      if (isbn.includes(query)) return true;
+      const dept = (b.department || '').toLowerCase();
+      if (dept.includes(query)) return true;
       const publisher = (b.publisher || '').toLowerCase();
-      const rawValues = Object.values(b.rawCsvData || {}).map(v => String(v).toLowerCase());
-
-      return (
-        title.includes(query) ||
-        author.includes(query) ||
-        dept.includes(query) ||
-        acc.includes(query) ||
-        isbn.includes(query) ||
-        publisher.includes(query) ||
-        rawValues.some(v => v.includes(query))
-      );
+      if (publisher.includes(query)) return true;
+      if (b.rawCsvData) {
+        for (const k in b.rawCsvData) {
+          if (String(b.rawCsvData[k]).toLowerCase().includes(query)) return true;
+        }
+      }
+      return false;
     });
   }, [books, searchFilter]);
 
@@ -2626,4 +2627,4 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     </div>
   );
-};
+});

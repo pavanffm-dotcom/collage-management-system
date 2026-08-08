@@ -123,6 +123,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isControlPanelModalOpen, setIsControlPanelModalOpen] = useState(false);
   const [isSearchLinkerModalOpen, setIsSearchLinkerModalOpen] = useState(false);
+  const [isQrColumnConnectorModalOpen, setIsQrColumnConnectorModalOpen] = useState(false);
   const [isAlmariConfiguratorModalOpen, setIsAlmariConfiguratorModalOpen] = useState(false);
   const [isRedirectLinksModalOpen, setIsRedirectLinksModalOpen] = useState(false);
   const [isPublicLinkModalOpen, setIsPublicLinkModalOpen] = useState(false);
@@ -197,6 +198,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return currentCollege?.searchMappings?.aiColumns || ['Description', 'Keywords', 'Summary', 'Subject', 'Title'];
   });
 
+  const [selectedBarcodeColumns, setSelectedBarcodeColumns] = useState<string[]>(() => {
+    return currentCollege?.searchMappings?.barcodeColumns || ['AccessionNumber', 'Accession Number', 'Barcode', 'ISBN', 'Book Code'];
+  });
+
+  const [selectedColumnColumns, setSelectedColumnColumns] = useState<string[]>(() => {
+    return currentCollege?.searchMappings?.columnColumns || ['Column', 'Col', 'Shelf Column', 'Sub-Shelf', 'Section'];
+  });
+
+  const [defaultColumnPos, setDefaultColumnPos] = useState<number>(() => {
+    return currentCollege?.searchMappings?.defaultColumnPos || 3;
+  });
+
   const [isSavingControlPanel, setIsSavingControlPanel] = useState(false);
   const [controlPanelSuccessMsg, setControlPanelSuccessMsg] = useState(false);
 
@@ -208,6 +221,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
       if (currentCollege.searchMappings.aiColumns?.length) {
         setSelectedAiColumns(currentCollege.searchMappings.aiColumns);
+      }
+      if (currentCollege.searchMappings.barcodeColumns?.length) {
+        setSelectedBarcodeColumns(currentCollege.searchMappings.barcodeColumns);
+      }
+      if (currentCollege.searchMappings.columnColumns?.length) {
+        setSelectedColumnColumns(currentCollege.searchMappings.columnColumns);
+      }
+      if (currentCollege.searchMappings.defaultColumnPos) {
+        setDefaultColumnPos(currentCollege.searchMappings.defaultColumnPos);
       }
     }
   }, [currentCollege]);
@@ -226,6 +248,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     colSet.add('AccessionNumber');
     colSet.add('Publisher');
     colSet.add('Department');
+    colSet.add('Almari');
+    colSet.add('Row');
+    colSet.add('Column');
 
     if (books && Array.isArray(books)) {
       books.forEach(b => {
@@ -265,20 +290,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     });
   };
 
+  const toggleBarcodeColumn = (colName: string) => {
+    setSelectedBarcodeColumns(prev => {
+      if (prev.includes(colName)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(c => c !== colName);
+      }
+      return [...prev, colName];
+    });
+  };
+
+  const toggleColumnColumn = (colName: string) => {
+    setSelectedColumnColumns(prev => {
+      if (prev.includes(colName)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(c => c !== colName);
+      }
+      return [...prev, colName];
+    });
+  };
+
   const handleSaveControlPanel = async () => {
     setIsSavingControlPanel(true);
     try {
       await onUpdateCollege({
         searchMappings: {
           nameColumns: selectedNameColumns.length > 0 ? selectedNameColumns : ['Title'],
-          aiColumns: selectedAiColumns.length > 0 ? selectedAiColumns : ['Description', 'Keywords', 'Summary', 'Subject', 'Title']
+          aiColumns: selectedAiColumns.length > 0 ? selectedAiColumns : ['Description', 'Keywords', 'Summary', 'Subject', 'Title'],
+          barcodeColumns: selectedBarcodeColumns,
+          columnColumns: selectedColumnColumns,
+          defaultColumnPos: defaultColumnPos
         }
       });
       setControlPanelSuccessMsg(true);
       setTimeout(() => {
         setControlPanelSuccessMsg(false);
         setIsControlPanelModalOpen(false);
-      }, 1500);
+        setIsSearchLinkerModalOpen(false);
+        setIsQrColumnConnectorModalOpen(false);
+      }, 1200);
     } catch (err) {
       console.error('Failed to update search connections:', err);
     } finally {
@@ -1006,6 +1056,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="button"
                 onClick={() => {
                   setIsControlPanelModalOpen(false);
+                  setIsQrColumnConnectorModalOpen(true);
+                }}
+                className={`w-full p-3.5 rounded-xl border ${currentPreset.cardBorder} hover:border-rose-400 dark:hover:border-rose-500 bg-slate-50/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left group`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg ${currentPreset.buttonBg} flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform`}>
+                    <Barcode className="w-4 h-4 text-rose-400" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                      Barcode & QR Column Field Connector
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                      Connect QR code detector to sheet column & set default shelf column (Col 1-4)
+                    </span>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsControlPanelModalOpen(false);
                   setIsAlmariConfiguratorModalOpen(true);
                 }}
                 className={`w-full p-3.5 rounded-xl border ${currentPreset.cardBorder} hover:border-amber-400 dark:hover:border-amber-500 bg-slate-50/80 dark:bg-slate-900/80 transition-all flex items-center justify-between gap-3 text-left group`}
@@ -1208,6 +1282,168 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className={`py-2.5 px-6 ${currentPreset.buttonBg} rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50`}
               >
                 <span>{isSavingControlPanel ? 'Updating...' : 'Update'}</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 📷 BARCODE & QR COLUMN FIELD CONNECTOR MODAL */}
+      {isQrColumnConnectorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className={`${currentPreset.modalBg} rounded-[24px] max-w-lg w-full border ${currentPreset.cardBorder} shadow-2xl p-5 sm:p-6 relative space-y-4 my-auto flex flex-col max-h-[90vh] overflow-y-auto`}>
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800/80 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsQrColumnConnectorModalOpen(false);
+                    setIsControlPanelModalOpen(true);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Back to Control Panel"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                </button>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-rose-500" />
+                    <span>Barcode & QR Column Field Connector</span>
+                  </h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Connect scanned code to sheet columns & default shelf column (Col 1-4)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsQrColumnConnectorModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Section 1: Barcode / Accession Code Headers */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <span>1. Barcode / QR Code Detected Sheet Fields:</span>
+                <span className="text-[10px] text-rose-500 font-semibold">
+                  {selectedBarcodeColumns.length} Fields Linked
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                {availableCatalogColumns.map(col => {
+                  const isSelected = selectedBarcodeColumns.some(c => c.toLowerCase() === col.toLowerCase());
+                  return (
+                    <button
+                      key={`bc-${col}`}
+                      type="button"
+                      onClick={() => toggleBarcodeColumn(col)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                        isSelected
+                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs scale-101'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                      }`}
+                    >
+                      {isSelected ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <Link2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                      <span>{col}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section 2: Column Headers for Shelf Columns (Col 1-4) */}
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <span>2. Shelf Column Sheet Fields (Col 1-4):</span>
+                <span className="text-[10px] text-indigo-500 font-semibold">
+                  {selectedColumnColumns.length} Fields Linked
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                {availableCatalogColumns.map(col => {
+                  const isSelected = selectedColumnColumns.some(c => c.toLowerCase() === col.toLowerCase());
+                  return (
+                    <button
+                      key={`col-${col}`}
+                      type="button"
+                      onClick={() => toggleColumnColumn(col)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                        isSelected
+                          ? `${currentPreset.buttonBg} border-transparent shadow-xs scale-101`
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                      }`}
+                    >
+                      {isSelected ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <Link2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                      <span>{col}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section 3: Default Column Position Selector */}
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <span>3. Default Shelf Column Fallback:</span>
+                <span className="text-[10px] text-amber-500 font-extrabold font-mono">
+                  Default: Col {defaultColumnPos}
+                </span>
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { num: 1, label: 'Col 1', sub: 'Left' },
+                  { num: 2, label: 'Col 2', sub: 'Left Middle' },
+                  { num: 3, label: 'Col 3', sub: 'Right Middle' },
+                  { num: 4, label: 'Col 4', sub: 'Right' }
+                ].map(item => {
+                  const isSel = defaultColumnPos === item.num;
+                  return (
+                    <button
+                      key={item.num}
+                      type="button"
+                      onClick={() => setDefaultColumnPos(item.num)}
+                      className={`py-2 px-1 rounded-xl text-center transition-all border font-mono ${
+                        isSel
+                          ? 'bg-amber-500 text-slate-950 border-amber-600 font-extrabold shadow-md ring-2 ring-amber-400/50 scale-[1.02]'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-amber-400'
+                      }`}
+                    >
+                      <span className="block text-xs font-black">{item.label}</span>
+                      <span className={`block text-[9px] font-bold ${isSel ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {item.sub}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer with Single Update Button */}
+            <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
+              <div className="text-[11px]">
+                {controlPanelSuccessMsg ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connection Saved!
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500">Live Scanners Synced</span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveControlPanel}
+                disabled={isSavingControlPanel}
+                className={`py-2.5 px-6 ${currentPreset.buttonBg} rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50`}
+              >
+                <span>{isSavingControlPanel ? 'Saving...' : 'Update Connection'}</span>
               </button>
             </div>
 
