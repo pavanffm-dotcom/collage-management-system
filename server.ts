@@ -814,6 +814,7 @@ app.post('/api/books/bulk', (req, res) => {
   });
 
   const timeStamp = Date.now();
+  const newlyCreatedBooks: Book[] = [];
 
   for (let i = 0; i < incomingBooks.length; i++) {
     const b = incomingBooks[i];
@@ -907,14 +908,13 @@ app.post('/api/books/bulk', (req, res) => {
         lastUpdated: dateStr
       };
 
-      const newIdx = booksCatalog.length;
-      booksCatalog.push(newBook);
-      if (newBook.accessionNumber) accessionMap.set(newBook.accessionNumber.toLowerCase(), newIdx);
-      if (newBook.isbn && !newBook.isbn.startsWith('978-0-0000')) isbnMap.set(newBook.isbn.toLowerCase(), newIdx);
-      titleAuthorMap.set(titleAuthorKey, newIdx);
-
+      newlyCreatedBooks.push(newBook);
       newCount++;
     }
+  }
+
+  if (newlyCreatedBooks.length > 0) {
+    booksCatalog.unshift(...newlyCreatedBooks);
   }
 
   saveData();

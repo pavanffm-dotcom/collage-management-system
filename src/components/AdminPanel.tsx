@@ -2385,17 +2385,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = React.memo(({
       {/* Bulk Import CSV Modal */}
       <BulkImportModal
         isOpen={isBulkModalOpen}
-        onClose={() => setIsBulkModalOpen(false)}
+        onClose={() => {
+          setIsBulkModalOpen(false);
+          setCurrentPage(1);
+        }}
         onSchemaDetected={handleSchemaDetected}
         onImportBooks={async (importedBooks) => {
+          setCurrentPage(1);
+          setSearchFilter('');
+          let res;
           if (onBulkAddBooks) {
-            return await onBulkAddBooks(importedBooks);
+            res = await onBulkAddBooks(importedBooks);
           } else {
             for (const b of importedBooks) {
               await onAddBook(b);
             }
-            return { newCount: importedBooks.length, updatedCount: 0 };
+            res = { newCount: importedBooks.length, updatedCount: 0 };
           }
+          setToast({ type: 'success', message: `Imported ${importedBooks.length} rows successfully! Showing at top of table.` });
+          return res;
         }}
         collegeName={currentCollege?.name}
       />

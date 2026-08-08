@@ -408,20 +408,34 @@ export default function App() {
       const data = await res.json();
       let serverBooks: Book[] = data.books || [];
 
-      // 2. Read local IndexedDB backup
-      const { books: localBooks, meta } = await getBooksFromLocalDB(collegeId);
+      // 2. Read local IndexedDB & localStorage backup
+      let { books: localBooks, meta } = await getBooksFromLocalDB(collegeId);
 
       // Scenario A: User previously cleared the full sheet explicitly
-      if (meta && meta.isExplicitClear && localBooks.length === 0 && serverBooks.length > 0) {
+      if (meta && meta.isExplicitClear && (!localBooks || localBooks.length === 0) && serverBooks.length > 0) {
         console.log(`⚡ Preserving user's explicit clear state. Purging server default seed books...`);
         await fetch(`/api/books/college/${collegeId}/clear`, { method: 'DELETE' });
         setBooks([]);
         return;
       }
 
-      // Scenario B: Server container restarted/rebuilt and reset to default seed books (<= 15 books), BUT local IndexedDB has user's uploaded dataset (> 15 books or meta saved)
-      if (localBooks && localBooks.length > 15 && serverBooks.length <= 15 && (!meta || !meta.isExplicitClear)) {
-        console.log(`⚡ Server container reset detected. Restoring ${localBooks.length} books from local IndexedDB storage to server...`);
+      // Check if local DB has user dataset and if server was reset or lacks local books
+      const localHasUserData = localBooks && localBooks.length > 0 && (!meta || !meta.isExplicitClear);
+      
+      // Determine if server dataset is just the default seed list
+      const serverIsDefaultSeed = serverBooks.length <= 15 && serverBooks.every(b => b.id.startsWith('bk-gec-0') || b.id.startsWith('bk-col-'));
+      
+      // Check if local dataset has books not present in server or local dataset is larger/newer
+      const needsRestore = localHasUserData && (
+        serverBooks.length === 0 ||
+        serverIsDefaultSeed ||
+        localBooks.length > serverBooks.length ||
+        localBooks.some(lb => !serverBooks.some(sb => sb.id === lb.id || (sb.title && lb.title && sb.title.toLowerCase() === lb.title.toLowerCase())))
+      );
+
+      // Scenario B: Restore user dataset to server
+      if (needsRestore) {
+        console.log(`⚡ Server container reset or update detected. Restoring ${localBooks.length} user-uploaded books from local storage to server...`);
         
         const restoreRes = await fetch('/api/books/replace', {
           method: 'POST',
@@ -438,14 +452,14 @@ export default function App() {
         }
       }
 
-      // Scenario C: Use server books and keep local IndexedDB in sync
+      // Scenario C: Use server books and keep local storage in sync
       setBooks(serverBooks);
       if (serverBooks.length > 0) {
         saveBooksToLocalDB(collegeId, serverBooks, false);
       }
     } catch (err) {
       console.error('Failed to fetch admin books:', err);
-      // Fallback to local IndexedDB if server request fails
+      // Fallback to local storage if server request fails
       const { books: localBooks } = await getBooksFromLocalDB(collegeId);
       if (localBooks && localBooks.length > 0) {
         setBooks(localBooks);
